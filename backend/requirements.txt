@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+httpx
+yt-dlp
+python-dotenv
+pytest
