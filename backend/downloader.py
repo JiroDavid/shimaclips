@@ -34,6 +34,7 @@ def download_clip(url: str, dest_dir: Path, basename: str, on_progress: Callable
     opts = {
         "outtmpl": str(Path(dest_dir) / f"{basename}.%(ext)s"),
         "format": "best[ext=mp4]/best",
+        "allowed_extractors": ["twitch:clips"],
         "quiet": True,
         "noprogress": True,
         "progress_hooks": [hook],

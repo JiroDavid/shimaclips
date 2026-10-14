@@ -5,6 +5,7 @@ import time
 from dataclasses import asdict
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
@@ -63,10 +64,22 @@ class SearchRequest(BaseModel):
         return self
 
 
+ALLOWED_CLIP_HOSTS = {"clips.twitch.tv", "www.twitch.tv", "twitch.tv"}
+
+
 class ClipRef(BaseModel):
     url: str
     title: str
     view_count: int
+
+    @field_validator("url")
+    @classmethod
+    def twitch_only(cls, v: str) -> str:
+        p = urlparse(v)
+        host = (p.hostname or "").rstrip(".").lower()
+        if p.scheme != "https" or host not in ALLOWED_CLIP_HOSTS or p.username or p.password:
+            raise ValueError("Only Twitch clip URLs are allowed")
+        return v
 
 
 class DownloadRequest(BaseModel):

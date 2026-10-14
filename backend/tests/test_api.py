@@ -102,7 +102,7 @@ def last_event(text):
 def test_download_flow_zip(api, monkeypatch):
     monkeypatch.setattr(main, "start_job", fake_start_job())
     c = api(FakeTwitch())
-    clips = [{"url": f"u{i}", "title": f"t{i}", "view_count": i} for i in range(2)]
+    clips = [{"url": f"https://clips.twitch.tv/u{i}", "title": f"t{i}", "view_count": i} for i in range(2)]
     job_id = c.post("/api/downloads", json={"clips": clips}).json()["job_id"]
 
     assert last_event(c.get(f"/api/downloads/{job_id}/events").text)["status"] == "done"
@@ -114,9 +114,9 @@ def test_download_flow_zip(api, monkeypatch):
 
 
 def test_download_partial_failure_still_delivers(api, monkeypatch):
-    monkeypatch.setattr(main, "start_job", fake_start_job(fail_urls={"u1"}))
+    monkeypatch.setattr(main, "start_job", fake_start_job(fail_urls={"https://clips.twitch.tv/u1"}))
     c = api(FakeTwitch())
-    clips = [{"url": f"u{i}", "title": f"t{i}", "view_count": i} for i in range(3)]
+    clips = [{"url": f"https://clips.twitch.tv/u{i}", "title": f"t{i}", "view_count": i} for i in range(3)]
     job_id = c.post("/api/downloads", json={"clips": clips}).json()["job_id"]
     last = last_event(c.get(f"/api/downloads/{job_id}/events").text)
     assert last["status"] == "done"
@@ -135,5 +135,29 @@ def test_file_unknown_job_404(api):
 def test_file_before_done_409(api, monkeypatch):
     monkeypatch.setattr(main, "start_job", lambda job, clips: None)
     c = api(FakeTwitch())
-    job_id = c.post("/api/downloads", json={"clips": [{"url": "u", "title": "t", "view_count": 1}]}).json()["job_id"]
+    job_id = c.post("/api/downloads", json={"clips": [{"url": "https://clips.twitch.tv/u", "title": "t", "view_count": 1}]}).json()["job_id"]
     assert c.get(f"/api/downloads/{job_id}/file").status_code == 409
+
+
+@pytest.mark.parametrize("url", [
+    "http://169.254.169.254/latest/meta-data",
+    "file:///etc/passwd",
+    "https://evil.example/clip",
+    "https://clips.twitch.tv.evil.example/x",
+    "https://user:pw@clips.twitch.tv/x",
+    "http://clips.twitch.tv/x",
+])
+def test_download_rejects_non_twitch_urls(api, monkeypatch, url):
+    monkeypatch.setattr(main, "start_job", lambda job, clips: None)
+    r = api(FakeTwitch()).post("/api/downloads", json={"clips": [{"url": url, "title": "t", "view_count": 1}]})
+    assert r.status_code == 422
+
+
+@pytest.mark.parametrize("url", [
+    "https://clips.twitch.tv/AbcSlug",
+    "https://www.twitch.tv/jasontheween/clip/AbcSlug",
+])
+def test_download_accepts_twitch_urls(api, monkeypatch, url):
+    monkeypatch.setattr(main, "start_job", lambda job, clips: None)
+    r = api(FakeTwitch()).post("/api/downloads", json={"clips": [{"url": url, "title": "t", "view_count": 1}]})
+    assert r.status_code == 200
