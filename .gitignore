@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.env
+node_modules/
+.next/
+*.pyc
+CLAUDE.md
+docs/superpowers/specs/
+docs/superpowers/plans/
