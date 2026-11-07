@@ -156,3 +156,13 @@ export async function getClips(
 export function fileUrl(jobId: string): string {
   return `${API}/api/downloads/${jobId}/file`;
 }
+
+export type SearchHit = { login: string; display_name: string; avatar_url: string; is_live: boolean };
+
+export async function searchStreamers(q: string, signal?: AbortSignal): Promise<SearchHit[]> {
+  const params = new URLSearchParams({ q });
+  const r = await fetch(`${API}/api/streamers/search?${params}`, { signal });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  const body = await r.json();
+  return body.results;
+}

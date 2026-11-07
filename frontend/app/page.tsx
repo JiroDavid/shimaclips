@@ -6,7 +6,7 @@ import DownloadPanel from "@/components/DownloadPanel";
 import LoadingBanner from "@/components/LoadingBanner";
 import ReelSection from "@/components/ReelSection";
 import SelectionPanel from "@/components/SelectionPanel";
-import StreamerEntry from "@/components/StreamerEntry";
+import StreamerSearch from "@/components/StreamerSearch";
 import { labelOfKey, rangeOfKey, todayUtc } from "@/lib/calendar";
 import { emptySelection, isNewStreamer, removeClip, toggleClip, type Selection } from "@/lib/selection";
 import type { Clip } from "@/lib/api";
@@ -72,7 +72,7 @@ export default function Home() {
     <main className="mx-auto max-w-6xl space-y-6 p-6">
       <h1 className="text-2xl font-bold">Shimaclips</h1>
 
-      <StreamerEntry onSubmit={submit} />
+      <StreamerSearch onSelect={submit} />
 
       {(busy || phase === "error") && (
         <LoadingBanner state={state} startedAt={startedAt} error={phase === "error" ? error : null} onRetry={retry} />
