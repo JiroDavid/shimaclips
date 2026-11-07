@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import threading
 import time
 from dataclasses import asdict
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from jobs import JobStore, job_to_dict, run_job
 from live import LiveClips
 from loader import LoadManager, LoaderUnavailable, StreamerNotFound, normalize_login, state_to_dict
-from store import Store
+from store import SEED_WATCHLIST, Store, WatchEntry
 from twitch import TwitchClient, TwitchError
 
 load_dotenv(Path(__file__).parent / ".env")
@@ -69,6 +69,7 @@ def get_store() -> Store:
         if _store is None:
             default = Path(__file__).parent / "shimaclips.db"
             _store = Store(Path(os.environ.get("SHIMACLIPS_DB") or default))
+            _store.seed_watchlist_once(SEED_WATCHLIST)
         return _store
 
 
@@ -111,6 +112,78 @@ class ClipRef(BaseModel):
 
 class DownloadRequest(BaseModel):
     clips: list[ClipRef] = Field(min_length=1)
+
+
+class WatchAddRequest(BaseModel):
+    login: str
+
+
+class WatchPauseRequest(BaseModel):
+    paused: bool
+
+
+def _watch_dict(entry: WatchEntry, store: Store) -> dict:
+    streamer = store.get_streamer(entry.login)
+    if entry.broadcaster_id is not None:
+        progress = store.progress(entry.broadcaster_id)
+        done, total = progress.windows_done, progress.windows_total
+    else:
+        done = total = 0
+    fresh = entry.last_refreshed is not None and (
+        datetime.now(timezone.utc) - entry.last_refreshed < timedelta(hours=24)
+    )
+    return {
+        "login": entry.login,
+        "display_name": streamer.display_name if streamer else entry.login,
+        "paused": entry.paused,
+        "last_refreshed": entry.last_refreshed.strftime("%Y-%m-%dT%H:%M:%SZ") if entry.last_refreshed else None,
+        "state": "paused" if entry.paused else "up_to_date" if fresh else "waiting",
+        "windows_done": done,
+        "windows_total": total,
+    }
+
+
+def _watch_entry(store: Store, login: str) -> WatchEntry:
+    for e in store.watch_list():
+        if e.login == login.lower():
+            return e
+    raise HTTPException(404, "Unknown watchlist entry")
+
+
+@app.get("/api/watchlist")
+def list_watchlist(store: Store = Depends(get_store)):
+    return {"entries": [_watch_dict(e, store) for e in store.watch_list()]}
+
+
+@app.post("/api/watchlist")
+def add_watchlist(body: WatchAddRequest, store: Store = Depends(get_store),
+                  twitch: TwitchClient = Depends(get_twitch)):
+    try:
+        login = normalize_login(body.login)
+    except ValueError:
+        raise HTTPException(422, "Streamer name must be 1-25 letters, numbers or underscores")
+    try:
+        user = twitch.get_user(login)
+    except TwitchError as e:
+        raise HTTPException(502, str(e))
+    if user is None:
+        raise HTTPException(404, f"Streamer '{login}' not found")
+    store.upsert_streamer(user)
+    store.watch_add(user.login, user.id)
+    return _watch_dict(_watch_entry(store, user.login), store)
+
+
+@app.delete("/api/watchlist/{login}", status_code=204)
+def remove_watchlist(login: str, store: Store = Depends(get_store)):
+    _watch_entry(store, login)
+    store.watch_remove(login)
+
+
+@app.put("/api/watchlist/{login}")
+def pause_watchlist(login: str, body: WatchPauseRequest, store: Store = Depends(get_store)):
+    _watch_entry(store, login)
+    store.watch_set_paused(login, body.paused)
+    return _watch_dict(_watch_entry(store, login), store)
 
 
 @app.get("/api/streamers/search")

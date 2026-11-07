@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 
-from store import SCHEMA_VERSION, Store
+from store import SCHEMA_VERSION, SEED_WATCHLIST, Store, WatchEntry
 from twitch import Clip, User
 
 UTC = timezone.utc
@@ -333,7 +333,7 @@ def test_version_2_database_gets_years_table_without_reset(tmp_path):
     conn.execute("PRAGMA user_version = 2")
     conn.close()
     s2 = Store(path)
-    assert user_version(path) == SCHEMA_VERSION == 3
+    assert user_version(path) == SCHEMA_VERSION == 4
     assert s2.progress("1").windows_done == 1
     s2.set_exact_year("1", 2020, True)
     assert 2020 in s2.exact_years("1", 2026)
@@ -460,3 +460,63 @@ def test_top_clips_newest_orders_by_created_at(tmp_path):
     import pytest
     with pytest.raises(ValueError):
         s.top_clips("1", None, None, 10, 0, sort="oldest")
+
+
+def test_seed_inserts_once_and_only_once(tmp_path):
+    s = make(tmp_path)
+    assert s.watch_list() == []
+    assert s.seed_watchlist_once(["Alpha", "beta"]) is True
+    entries = s.watch_list()
+    assert [e.login for e in entries] == ["alpha", "beta"]
+    assert all(e.broadcaster_id is None and not e.paused and e.last_refreshed is None for e in entries)
+    s.watch_remove("alpha")
+    assert s.seed_watchlist_once(["alpha"]) is False
+    assert Store(tmp_path / "s.db").seed_watchlist_once(["alpha"]) is False
+    assert [e.login for e in s.watch_list()] == ["beta"]
+    assert SEED_WATCHLIST == ["stableronaldo", "jasontheween", "arky", "marlon", "yugi", "ludwig"]
+
+
+def test_watch_add_is_idempotent_and_remove_works(tmp_path):
+    s = make(tmp_path)
+    s.watch_add("jason", None)
+    s.watch_add("jason", "7")
+    s.watch_add("jason", "8")
+    (e,) = s.watch_list()
+    assert isinstance(e, WatchEntry) and e.login == "jason" and e.broadcaster_id == "7"
+    s.watch_remove("nobody")
+    s.watch_remove("jason")
+    assert s.watch_list() == []
+
+
+def test_paused_and_refreshed_round_trip(tmp_path):
+    s = make(tmp_path)
+    s.watch_add("jason", None)
+    s.watch_set_paused("jason", True)
+    s.watch_set_broadcaster("jason", "9")
+    s.watch_mark_refreshed("jason", dt(2026, 11, 1, 5))
+    (e,) = s.watch_list()
+    assert e.paused is True and e.broadcaster_id == "9" and e.last_refreshed == dt(2026, 11, 1, 5)
+    s.watch_set_paused("jason", False)
+    s.watch_set_paused("ghost", True)
+    assert s.watch_list()[0].paused is False
+    assert len(s.watch_list()) == 1
+
+
+def test_version_3_database_gets_watchlist_tables(tmp_path):
+    import sqlite3
+    s = make(tmp_path)
+    month = (dt(2026, 1, 1), dt(2026, 2, 1))
+    s.add_windows("1", [month])
+    s.mark_done("1", *month, dt(2026, 3, 1), False)
+    path = tmp_path / "s.db"
+    conn = sqlite3.connect(path)
+    conn.execute("DROP TABLE watchlist")
+    conn.execute("DROP TABLE meta")
+    conn.execute("PRAGMA user_version = 3")
+    conn.commit()
+    conn.close()
+    s2 = Store(path)
+    assert user_version(path) == SCHEMA_VERSION == 4
+    assert s2.progress("1").windows_done == 1
+    assert s2.watch_list() == []
+    assert s2.seed_watchlist_once(["a"]) is True

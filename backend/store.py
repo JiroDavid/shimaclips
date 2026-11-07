@@ -7,7 +7,8 @@ from pathlib import Path
 from twitch import Clip, User
 
 _FMT = "%Y-%m-%dT%H:%M:%SZ"
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
+SEED_WATCHLIST = ["stableronaldo", "jasontheween", "arky", "marlon", "yugi", "ludwig"]
 
 
 def _enc(d: datetime) -> str:
@@ -56,6 +57,15 @@ class YearInfo:
 
 
 @dataclass
+class WatchEntry:
+    login: str
+    broadcaster_id: str | None
+    paused: bool
+    last_refreshed: datetime | None
+    added_at: datetime
+
+
+@dataclass
 class Progress:
     windows_done: int
     windows_total: int
@@ -98,6 +108,17 @@ CREATE TABLE IF NOT EXISTS streamer_years (
     year INTEGER NOT NULL,
     enabled INTEGER NOT NULL,
     PRIMARY KEY (broadcaster_id, year)
+);
+CREATE TABLE IF NOT EXISTS watchlist (
+    login TEXT PRIMARY KEY,
+    broadcaster_id TEXT,
+    paused INTEGER NOT NULL DEFAULT 0,
+    last_refreshed TEXT,
+    added_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT
 );
 """
 
@@ -369,6 +390,69 @@ class Store:
             for r in rows
         ]
         return clips, total
+
+    def seed_watchlist_once(self, logins: list[str]) -> bool:
+        now = _enc(datetime.now(timezone.utc))
+        with closing(self._connect()) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                done = conn.execute(
+                    "SELECT 1 FROM meta WHERE key = 'watchlist_seeded'"
+                ).fetchone()
+                if done:
+                    conn.execute("ROLLBACK")
+                    return False
+                conn.executemany(
+                    "INSERT OR IGNORE INTO watchlist (login, added_at) VALUES (?, ?)",
+                    [(l.lower(), now) for l in logins],
+                )
+                conn.execute("INSERT INTO meta (key, value) VALUES ('watchlist_seeded', '1')")
+                conn.execute("COMMIT")
+            except BaseException:
+                conn.execute("ROLLBACK")
+                raise
+        return True
+
+    def watch_add(self, login: str, broadcaster_id: str | None) -> None:
+        login = login.lower()
+        now = _enc(datetime.now(timezone.utc))
+        with closing(self._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "INSERT OR IGNORE INTO watchlist (login, broadcaster_id, added_at) VALUES (?, ?, ?)",
+                    (login, broadcaster_id, now),
+                )
+                if broadcaster_id is not None:
+                    conn.execute(
+                        "UPDATE watchlist SET broadcaster_id = ? WHERE login = ? AND broadcaster_id IS NULL",
+                        (broadcaster_id, login),
+                    )
+
+    def watch_remove(self, login: str) -> None:
+        self._write("DELETE FROM watchlist WHERE login = ?", [(login.lower(),)])
+
+    def watch_list(self) -> list[WatchEntry]:
+        with closing(self._connect()) as conn:
+            rows = conn.execute("SELECT * FROM watchlist ORDER BY added_at, login").fetchall()
+        return [
+            WatchEntry(
+                r["login"], r["broadcaster_id"], bool(r["paused"]),
+                _dec(r["last_refreshed"]) if r["last_refreshed"] else None,
+                _dec(r["added_at"]),
+            )
+            for r in rows
+        ]
+
+    def watch_set_paused(self, login: str, paused: bool) -> None:
+        self._write("UPDATE watchlist SET paused = ? WHERE login = ?", [(int(paused), login.lower())])
+
+    def watch_set_broadcaster(self, login: str, broadcaster_id: str) -> None:
+        self._write("UPDATE watchlist SET broadcaster_id = ? WHERE login = ?",
+                    [(broadcaster_id, login.lower())])
+
+    def watch_mark_refreshed(self, login: str, at: datetime) -> None:
+        self._write("UPDATE watchlist SET last_refreshed = ? WHERE login = ?",
+                    [(_enc(at), login.lower())])
 
     def progress(self, broadcaster_id: str, allowed_years: set[int] | None = None) -> Progress:
         expr, extra = _in_scope(allowed_years)

@@ -438,3 +438,48 @@ def test_clips_twitch_error_serves_cached_when_present(api):
     assert r.status_code == 200
     assert r.json()["exact"] is False
     assert len(r.json()["clips"]) == 1
+
+
+def test_watchlist_get_post_delete_put(api):
+    fake = FakeTwitch(logins=("jason",))
+    c = api(fake)
+    main.app.dependency_overrides[main.get_twitch] = lambda: fake
+    c.store.watch_add("pending", None)
+    r = c.post("/api/watchlist", json={"login": " @Jason "})
+    assert r.status_code == 200
+    assert r.json() == {"login": "jason", "display_name": "Jason", "paused": False,
+                        "last_refreshed": None, "state": "waiting",
+                        "windows_done": 0, "windows_total": 0}
+    c.store.watch_mark_refreshed("jason", datetime.now(timezone.utc))
+    entries = c.get("/api/watchlist").json()["entries"]
+    by = {e["login"]: e for e in entries}
+    assert set(by) == {"pending", "jason"}
+    assert by["pending"]["display_name"] == "pending" and by["pending"]["state"] == "waiting"
+    assert by["jason"]["state"] == "up_to_date"
+    assert by["jason"]["last_refreshed"].endswith("Z")
+    r = c.put("/api/watchlist/jason", json={"paused": True})
+    assert r.status_code == 200 and r.json()["paused"] is True and r.json()["state"] == "paused"
+    assert c.put("/api/watchlist/ghost", json={"paused": True}).status_code == 404
+    r = c.delete("/api/watchlist/jason")
+    assert r.status_code == 204 and r.content == b""
+    assert c.delete("/api/watchlist/jason").status_code == 404
+    assert [e["login"] for e in c.get("/api/watchlist").json()["entries"]] == ["pending"]
+
+
+def test_watchlist_post_unknown_streamer_404(api):
+    fake = FakeTwitch(logins=("jason",))
+    c = api(fake)
+    main.app.dependency_overrides[main.get_twitch] = lambda: fake
+    r = c.post("/api/watchlist", json={"login": "nobody"})
+    assert r.status_code == 404 and r.json()["detail"] == "Streamer 'nobody' not found"
+    fake.error = TwitchError("boom")
+    r = c.post("/api/watchlist", json={"login": "jason"})
+    assert r.status_code == 502 and r.json()["detail"] == "boom"
+
+
+def test_watchlist_post_bad_login_422(api):
+    c = api()
+    main.app.dependency_overrides[main.get_twitch] = lambda: FakeTwitch()
+    r = c.post("/api/watchlist", json={"login": "bad name!"})
+    assert r.status_code == 422
+    assert r.json()["detail"] == "Streamer name must be 1-25 letters, numbers or underscores"
