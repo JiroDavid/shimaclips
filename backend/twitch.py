@@ -42,6 +42,15 @@ class User:
 
 
 @dataclass
+class ChannelHit:
+    id: str
+    login: str
+    display_name: str
+    thumbnail_url: str
+    is_live: bool
+
+
+@dataclass
 class ClipsResult:
     clips: list[Clip]
     truncated: bool
@@ -49,6 +58,14 @@ class ClipsResult:
 
 def _rfc3339(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _to_clip(c: dict) -> Clip:
+    return Clip(
+        id=c["id"], url=c["url"], title=c["title"], thumbnail_url=c["thumbnail_url"],
+        view_count=c["view_count"], duration=c["duration"],
+        creator_name=c["creator_name"], created_at=c["created_at"],
+    )
 
 
 def _now() -> float:
@@ -156,6 +173,39 @@ class TwitchClient:
         created = datetime.fromisoformat(u["created_at"].replace("Z", "+00:00")).astimezone(timezone.utc)
         return User(id=u["id"], login=u["login"], display_name=u["display_name"], created_at=created)
 
+    def search_channels(self, query: str, limit: int = 8) -> list[ChannelHit]:
+        body = self._get("/search/channels", {"query": query, "first": max(limit, 20)})
+        hits = [
+            ChannelHit(
+                id=c["id"], login=c["broadcaster_login"], display_name=c["display_name"],
+                thumbnail_url=c["thumbnail_url"], is_live=c["is_live"],
+            )
+            for c in body["data"]
+        ]
+        wanted = query.strip().lstrip("@").lower()
+        hits.sort(key=lambda h: h.login.lower() != wanted)
+        return hits[:limit]
+
+    def fetch_top(self, broadcaster_id: str, start: datetime | None, end: datetime | None, limit: int) -> list[Clip]:
+        clips: list[Clip] = []
+        cursor = None
+        pages = 0
+        while len(clips) < limit and pages < HELIX_PAGE_LIMIT:
+            params = {"broadcaster_id": broadcaster_id, "first": min(100, limit - len(clips))}
+            if start is not None:
+                params["started_at"] = _rfc3339(start)
+            if end is not None:
+                params["ended_at"] = _rfc3339(end)
+            if cursor:
+                params["after"] = cursor
+            body = self._get("/clips", params)
+            pages += 1
+            clips += [_to_clip(c) for c in body["data"]]
+            cursor = body.get("pagination", {}).get("cursor")
+            if not cursor:
+                break
+        return clips[:limit]
+
     def fetch_window(self, broadcaster_id: str, start: datetime, end: datetime) -> ClipsResult:
         clips, pages = self._collect_clips(broadcaster_id, start, end)
         truncated = len(clips) >= MAX_CLIPS or pages >= HELIX_PAGE_LIMIT
@@ -176,14 +226,7 @@ class TwitchClient:
                 params["after"] = cursor
             body = self._get("/clips", params)
             pages += 1
-            clips += [
-                Clip(
-                    id=c["id"], url=c["url"], title=c["title"], thumbnail_url=c["thumbnail_url"],
-                    view_count=c["view_count"], duration=c["duration"],
-                    creator_name=c["creator_name"], created_at=c["created_at"],
-                )
-                for c in body["data"]
-            ]
+            clips += [_to_clip(c) for c in body["data"]]
             cursor = body.get("pagination", {}).get("cursor")
             if not cursor:
                 break

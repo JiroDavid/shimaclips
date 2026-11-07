@@ -215,3 +215,85 @@ def test_fetch_window_with_few_short_pages_is_complete():
     result = make_client(paged_handler(4, 60)).fetch_window("42", START, END)
     assert len(result.clips) == 240
     assert result.truncated is False
+
+
+def capture_handler(pages, per_page=100):
+    requests = []
+
+    def on_api(request):
+        requests.append(request)
+        page = int(request.url.params.get("after", "0"))
+        data = [raw_clip(page * 100 + i, views=100000 - page * 100 - i) for i in range(per_page)]
+        more = {"cursor": str(page + 1)} if page + 1 < pages else {}
+        return httpx.Response(200, json={"data": data, "pagination": more})
+
+    return base_handler(on_api), requests
+
+
+def raw_channel(login, i=0, live=False):
+    return {
+        "id": str(i), "broadcaster_login": login, "display_name": login.title(),
+        "thumbnail_url": f"{login}.png", "is_live": live,
+    }
+
+
+def test_search_channels_maps_fields_and_puts_exact_login_first():
+    data = [raw_channel("shroud2", 1), raw_channel("shroud", 2, live=True), raw_channel("shro", 3)]
+    requests = []
+
+    def on_api(request):
+        requests.append(request)
+        return httpx.Response(200, json={"data": data})
+
+    hits = make_client(base_handler(on_api)).search_channels("Shroud")
+    assert requests[0].url.path.endswith("/search/channels")
+    assert requests[0].url.params["query"] == "Shroud"
+    assert requests[0].url.params["first"] == "20"
+    assert hits[0] == twitch.ChannelHit("2", "shroud", "Shroud", "shroud.png", True)
+    assert [h.login for h in hits] == ["shroud", "shroud2", "shro"]
+
+
+def test_search_channels_limits_results():
+    data = [raw_channel(f"c{i}", i) for i in range(20)] + [raw_channel("exact", 99)]
+    client = make_client(base_handler(lambda r: httpx.Response(200, json={"data": data})))
+    hits = client.search_channels("exact", limit=3)
+    assert len(hits) == 3
+    assert hits[0].login == "exact"
+
+
+def test_search_channels_empty():
+    client = make_client(base_handler(lambda r: httpx.Response(200, json={"data": []})))
+    assert client.search_channels("zzz") == []
+
+
+def test_fetch_top_requests_only_needed_pages():
+    handler, requests = capture_handler(10)
+    clips = make_client(handler).fetch_top("42", START, END, 250)
+    assert [r.url.params["first"] for r in requests] == ["100", "100", "50"]
+    assert len(clips) == 250
+    assert clips[0].id == "c0"
+
+
+def test_fetch_top_all_time_omits_date_params():
+    handler, requests = capture_handler(1)
+    make_client(handler).fetch_top("42", None, None, 10)
+    assert "started_at" not in requests[0].url.params
+    assert "ended_at" not in requests[0].url.params
+    handler, requests = capture_handler(1)
+    make_client(handler).fetch_top("42", START, END, 10)
+    assert requests[0].url.params["started_at"] == "2026-01-01T00:00:00Z"
+    assert requests[0].url.params["ended_at"] == "2026-02-01T00:00:00Z"
+
+
+def test_fetch_top_stops_without_cursor():
+    handler, requests = capture_handler(2, per_page=30)
+    clips = make_client(handler).fetch_top("42", START, END, 300)
+    assert len(requests) == 2
+    assert len(clips) == 60
+
+
+def test_fetch_top_never_exceeds_page_limit():
+    handler, requests = capture_handler(50)
+    clips = make_client(handler).fetch_top("42", START, END, 5000)
+    assert len(requests) == 10
+    assert len(clips) == 1000
