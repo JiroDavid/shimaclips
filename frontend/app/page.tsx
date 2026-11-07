@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import CalendarView from "@/components/CalendarView";
 import LoadingBanner from "@/components/LoadingBanner";
 import StreamerEntry from "@/components/StreamerEntry";
 import { useStreamer } from "@/lib/useStreamer";
 
 export default function Home() {
-  const { streamer, state, phase, error, startedAt, open, refresh } = useStreamer();
+  const { streamer, state, phase, error, tick, startedAt, open, refresh } = useStreamer();
   const [lastLogin, setLastLogin] = useState("");
+  const [selection, setSelection] = useState<{ login: string; key: string } | null>(null);
+  const selectedKey = streamer && selection?.login === streamer.login ? selection.key : null;
 
   const busy = phase === "opening" || phase === "loading";
 
@@ -56,6 +59,27 @@ export default function Home() {
             </button>
           </div>
         </div>
+      )}
+
+      {streamer && (
+        <>
+          <CalendarView
+            key={streamer.login}
+            login={streamer.login}
+            tick={tick}
+            accountCreated={streamer.account_created}
+            selectedKey={selectedKey}
+            onSelect={(key) => setSelection(key ? { login: streamer.login, key } : null)}
+          />
+          {selectedKey && (
+            <p className="text-sm text-zinc-400">
+              Selected: {selectedKey}{" "}
+              <button onClick={() => setSelection(null)} className="underline hover:text-zinc-200">
+                Clear
+              </button>
+            </p>
+          )}
+        </>
       )}
     </main>
   );

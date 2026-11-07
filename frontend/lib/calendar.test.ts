@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { heatLevel, monthDays, rangeOfKey, shiftMonth, shiftWeek, weekDays } from "./calendar";
+import { heatLevel, isCellDisabled, todayUtc, monthDays, rangeOfKey, shiftMonth, shiftWeek, weekDays } from "./calendar";
 
 describe("calendar", () => {
   it("weekDays starts monday", () => {
@@ -55,5 +55,22 @@ describe("calendar", () => {
     expect(rangeOfKey("2028-02")).toEqual({ start: "2028-02-01", end: "2028-02-29" });
     expect(rangeOfKey("2026")).toEqual({ start: "2026-01-01", end: "2026-12-31" });
     expect(rangeOfKey("2026-11-05")).toEqual({ start: "2026-11-05", end: "2026-11-05" });
+  });
+
+  it("todayUtc formats the UTC date", () => {
+    expect(todayUtc(new Date("2026-11-07T23:59:59Z"))).toBe("2026-11-07");
+    expect(todayUtc(new Date("2026-01-01T00:00:00Z"))).toBe("2026-01-01");
+  });
+
+  it("isCellDisabled covers not ready, future and pre-creation cells", () => {
+    const today = "2026-11-07";
+    const created = "2026-03-10";
+    expect(isCellDisabled("2026-05-01", "2026-05-31", created, today, true)).toBe(false);
+    expect(isCellDisabled("2026-05-01", "2026-05-31", created, today, false)).toBe(true);
+    expect(isCellDisabled("2026-11-08", "2026-11-08", created, today, true)).toBe(true);
+    expect(isCellDisabled("2026-11-07", "2026-11-07", created, today, true)).toBe(false);
+    expect(isCellDisabled("2026-03-01", "2026-03-31", created, today, true)).toBe(false);
+    expect(isCellDisabled("2026-02-01", "2026-02-28", created, today, true)).toBe(true);
+    expect(isCellDisabled("2026-03-09", "2026-03-09", created, today, true)).toBe(true);
   });
 });

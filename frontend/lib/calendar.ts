@@ -51,3 +51,17 @@ export function rangeOfKey(key: string): { start: string; end: string } {
   }
   return { start: key, end: key };
 }
+
+export function todayUtc(now: Date = new Date()): string {
+  return fmt(now);
+}
+
+export function isCellDisabled(
+  cellStart: string,
+  cellEnd: string,
+  accountCreated: string,
+  today: string,
+  ready: boolean,
+): boolean {
+  return !ready || cellStart > today || cellEnd < accountCreated;
+}
