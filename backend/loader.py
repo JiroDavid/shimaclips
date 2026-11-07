@@ -102,6 +102,10 @@ class LoadManager:
             return None
         return self._snapshot(streamer.broadcaster_id, job)
 
+    def interactive_active(self) -> bool:
+        with self._lock:
+            return any(j.status in ("queued", "running") for j in self._jobs.values())
+
     def shutdown(self, wait: bool = False) -> None:
         self._stop.set()
         self._pool.shutdown(wait=wait, cancel_futures=True)

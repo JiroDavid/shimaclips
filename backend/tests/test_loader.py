@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from loader import LoadManager, LoaderUnavailable, StreamerNotFound, normalize_login, state_to_dict
+from loader import LoadManager, LoaderUnavailable, _Job, StreamerNotFound, normalize_login, state_to_dict
 from store import Store
 from twitch import ClipsResult, TwitchError, User
 
@@ -239,3 +239,30 @@ def test_set_year_unknown_streamer_raises(env):
         mgr.set_year("nobody", 2024, True)
     with pytest.raises(ValueError):
         mgr.set_year("a/b", 2024, True)
+
+
+def test_interactive_active_reflects_queued_and_running_jobs(env):
+    twitch, _, mgr = env
+    assert mgr.interactive_active() is False
+    for n in ("alpha", "beta", "gamma"):
+        twitch.hold(n)
+    mgr.ensure("alpha")
+    assert twitch.entered["1"].wait(5)
+    assert mgr.interactive_active() is True
+    mgr.ensure("beta")
+    _, st = mgr.ensure("gamma")
+    assert st.status == "queued"
+    twitch.release("alpha")
+    twitch.release("beta")
+    assert wait_for(lambda: mgr.state("beta").status == "done")
+    assert mgr.state("gamma").status in ("queued", "running")
+    assert mgr.interactive_active() is True
+    twitch.release("gamma")
+    assert wait_for(lambda: mgr.state("gamma").status == "done")
+    assert mgr.interactive_active() is False
+    with mgr._lock:
+        mgr._jobs["9"] = _Job("queued", None, 0.0)
+    assert mgr.interactive_active() is True
+    with mgr._lock:
+        mgr._jobs["9"].status = "error"
+    assert mgr.interactive_active() is False

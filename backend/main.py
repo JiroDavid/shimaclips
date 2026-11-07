@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from crawler import WatchCrawler
 from jobs import JobStore, job_to_dict, run_job
 from live import LiveClips
 from loader import LoadManager, LoaderUnavailable, StreamerNotFound, normalize_login, state_to_dict
@@ -26,9 +27,13 @@ load_dotenv(Path(__file__).parent / ".env")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if os.environ.get("SHIMACLIPS_CRAWLER") != "0":
+        get_crawler().start()
     yield
     with _deps_lock:
-        manager = _manager
+        crawler, manager = _crawler, _manager
+    if crawler is not None:
+        crawler.stop()
     if manager is not None:
         manager.shutdown()
 
@@ -60,6 +65,7 @@ def get_twitch() -> TwitchClient:
 _store: Store | None = None
 _manager: LoadManager | None = None
 _live: LiveClips | None = None
+_crawler: WatchCrawler | None = None
 _deps_lock = threading.Lock()
 
 
@@ -89,6 +95,27 @@ def get_live() -> LiveClips:
         if _live is None:
             _live = LiveClips(store, get_twitch)
         return _live
+
+
+def get_crawler() -> WatchCrawler:
+    global _crawler
+    store = get_store()
+    manager = get_manager()
+    with _deps_lock:
+        if _crawler is None:
+            _crawler = WatchCrawler(store, manager, get_twitch)
+        return _crawler
+
+
+def _crawl_status(login: str) -> dict | None:
+    with _deps_lock:
+        crawler = _crawler
+    if crawler is None:
+        return None
+    try:
+        return crawler.status(login)
+    except KeyError:
+        return None
 
 
 MAX_CALENDAR_DAYS = 400
@@ -132,12 +159,16 @@ def _watch_dict(entry: WatchEntry, store: Store) -> dict:
     fresh = entry.last_refreshed is not None and (
         datetime.now(timezone.utc) - entry.last_refreshed < timedelta(hours=24)
     )
+    state = "paused" if entry.paused else "up_to_date" if fresh else "waiting"
+    crawl = _crawl_status(entry.login)
+    if crawl is not None:
+        state, done, total = crawl["state"], crawl["windows_done"], crawl["windows_total"]
     return {
         "login": entry.login,
         "display_name": streamer.display_name if streamer else entry.login,
         "paused": entry.paused,
         "last_refreshed": entry.last_refreshed.strftime("%Y-%m-%dT%H:%M:%SZ") if entry.last_refreshed else None,
-        "state": "paused" if entry.paused else "up_to_date" if fresh else "waiting",
+        "state": state,
         "windows_done": done,
         "windows_total": total,
     }

@@ -483,3 +483,62 @@ def test_watchlist_post_bad_login_422(api):
     r = c.post("/api/watchlist", json={"login": "bad name!"})
     assert r.status_code == 422
     assert r.json()["detail"] == "Streamer name must be 1-25 letters, numbers or underscores"
+
+
+class FakeCrawler:
+    def __init__(self):
+        self.started = self.stopped = 0
+
+    def status(self, login):
+        if login == "pending":
+            raise KeyError(login)
+        return {"state": "loading", "windows_done": 3, "windows_total": 9}
+
+    def start(self):
+        self.started += 1
+
+    def stop(self):
+        self.stopped += 1
+
+
+def test_watchlist_uses_crawler_status_when_present(api, monkeypatch):
+    fake = FakeTwitch(logins=("jason",))
+    c = api(fake)
+    main.app.dependency_overrides[main.get_twitch] = lambda: fake
+    monkeypatch.setattr(main, "_crawler", FakeCrawler())
+    r = c.post("/api/watchlist", json={"login": "jason"})
+    assert r.status_code == 200
+    assert (r.json()["state"], r.json()["windows_done"], r.json()["windows_total"]) == ("loading", 3, 9)
+    c.store.watch_add("pending", None)
+    by = {e["login"]: e for e in c.get("/api/watchlist").json()["entries"]}
+    assert (by["jason"]["state"], by["jason"]["windows_done"], by["jason"]["windows_total"]) == ("loading", 3, 9)
+    assert by["pending"]["state"] == "waiting"
+    assert set(by["jason"]) == {"login", "display_name", "paused", "last_refreshed", "state",
+                                "windows_done", "windows_total"}
+
+
+def test_lifespan_skips_crawler_when_disabled(monkeypatch):
+    assert main.os.environ.get("SHIMACLIPS_CRAWLER") == "0"
+    called = []
+    monkeypatch.setattr(main, "get_crawler", lambda: called.append(1))
+    with TestClient(main.app):
+        pass
+    assert called == []
+
+
+def test_lifespan_starts_and_stops_crawler_before_manager(monkeypatch):
+    order = []
+    crawler = FakeCrawler()
+    crawler.stop = lambda: order.append("crawler")
+
+    class Mgr:
+        def shutdown(self):
+            order.append("manager")
+
+    monkeypatch.setenv("SHIMACLIPS_CRAWLER", "1")
+    monkeypatch.setattr(main, "get_crawler", lambda: crawler)
+    monkeypatch.setattr(main, "_crawler", crawler)
+    monkeypatch.setattr(main, "_manager", Mgr())
+    with TestClient(main.app):
+        assert crawler.started == 1
+    assert order == ["crawler", "manager"]
