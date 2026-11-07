@@ -337,3 +337,91 @@ def test_version_2_database_gets_years_table_without_reset(tmp_path):
     assert s2.progress("1").windows_done == 1
     s2.set_exact_year("1", 2020, True)
     assert 2020 in s2.exact_years("1", 2026)
+
+
+def _state(s, day=date(2026, 1, 1), g="month"):
+    return s.bucket_counts("1", day, day, g)[0]
+
+
+def test_bucket_state_exact_when_all_leaves_fetched_and_not_truncated(tmp_path):
+    s = make(tmp_path)
+    s.upsert_clips("1", [clip("a", "2026-01-02T00:00:00Z")])
+    s.add_windows("1", [(dt(2026, 1, 1), dt(2026, 2, 1))])
+    s.mark_done("1", dt(2026, 1, 1), dt(2026, 2, 1), dt(2026, 3, 1), False)
+    b = _state(s)
+    assert (b.state, b.ready, b.count) == ("exact", True, 1)
+
+
+def test_bucket_state_approximate_when_a_child_window_is_pending(tmp_path):
+    s = make(tmp_path)
+    month = (dt(2026, 1, 1), dt(2026, 2, 1))
+    s.add_windows("1", [month])
+    s.mark_done("1", *month, dt(2026, 3, 1), True)
+    s.upsert_clips("1", [clip("a", "2026-01-02T00:00:00Z")])
+    s.mark_split("1", *month, [(dt(2026, 1, 1), dt(2026, 1, 16)), (dt(2026, 1, 16), dt(2026, 2, 1))])
+    b = _state(s)
+    assert (b.state, b.ready, b.count) == ("approximate", False, 1)
+
+
+def test_bucket_state_approximate_when_leaf_truncated(tmp_path):
+    s = make(tmp_path)
+    s.add_windows("1", [(dt(2026, 1, 5, 3), dt(2026, 1, 5, 4))])
+    s.mark_done("1", dt(2026, 1, 5, 3), dt(2026, 1, 5, 4), dt(2026, 3, 1), True)
+    s.upsert_clips("1", [clip("a", "2026-01-05T03:10:00Z")])
+    assert _state(s, date(2026, 1, 5), "day").state == "approximate"
+    assert _state(s).state == "approximate"
+
+
+def test_bucket_state_empty_when_not_exact_and_no_clips(tmp_path):
+    s = make(tmp_path)
+    assert _state(s).state == "empty"
+    s.add_windows("1", [(dt(2026, 1, 1), dt(2026, 2, 1))])
+    assert _state(s).state == "empty"
+
+
+def test_bucket_with_no_leaf_and_clips_is_approximate(tmp_path):
+    s = make(tmp_path)
+    s.upsert_clips("1", [clip("a", "2026-01-02T00:00:00Z")])
+    assert _state(s).state == "approximate"
+
+
+def test_exact_bucket_with_zero_clips_is_exact(tmp_path):
+    s = make(tmp_path)
+    s.add_windows("1", [(dt(2026, 1, 1), dt(2026, 2, 1))])
+    s.mark_done("1", dt(2026, 1, 1), dt(2026, 2, 1), dt(2026, 3, 1), False)
+    b = _state(s)
+    assert (b.state, b.ready, b.count) == ("exact", True, 0)
+
+
+def test_years_summary_states_and_enabled_flags(tmp_path):
+    s = make(tmp_path)
+    y24 = (dt(2024, 1, 1), dt(2025, 1, 1))
+    s.add_windows("1", [y24, (dt(2025, 1, 1), dt(2025, 2, 1)), (dt(2025, 2, 1), dt(2025, 3, 1))])
+    s.mark_done("1", *y24, dt(2026, 1, 1), False)
+    s.mark_done("1", dt(2025, 1, 1), dt(2025, 2, 1), dt(2026, 1, 1), False)
+    s.upsert_clips("1", [
+        clip("a", "2024-06-01T00:00:00Z"),
+        clip("b", "2024-12-31T23:59:59Z"),
+        clip("c", "2025-01-10T00:00:00Z"),
+        clip("d", "2026-05-01T00:00:00Z"),
+    ])
+    s.set_exact_year("1", 2023, True)
+    s.set_exact_year("1", 2025, False)
+    got = s.years_summary("1", 2022, 2026, 2026)
+    assert [(y.year, y.enabled, y.state, y.clips) for y in got] == [
+        (2022, False, "empty", 0),
+        (2023, True, "empty", 0),
+        (2024, False, "exact", 2),
+        (2025, False, "approximate", 1),
+        (2026, True, "approximate", 1),
+    ]
+
+
+def test_years_summary_capped_leaf_is_approximate(tmp_path):
+    s = make(tmp_path)
+    s.add_windows("1", [(dt(2024, 3, 1, 5), dt(2024, 3, 1, 6)), (dt(2024, 1, 1), dt(2024, 3, 1, 5))])
+    s.mark_done("1", dt(2024, 3, 1, 5), dt(2024, 3, 1, 6), dt(2026, 1, 1), True)
+    s.mark_done("1", dt(2024, 1, 1), dt(2024, 3, 1, 5), dt(2026, 1, 1), False)
+    s.upsert_clips("1", [clip("a", "2024-03-01T05:30:00Z")])
+    (y,) = s.years_summary("1", 2024, 2024, 2026)
+    assert y.state == "approximate"

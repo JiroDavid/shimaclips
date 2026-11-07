@@ -113,7 +113,39 @@ def test_calendar_zero_fills_and_flags_ready(api):
     assert buckets["2025-12"]["count"] == 0
     assert buckets["2026-01"]["count"] == 2
     assert buckets["2026-01"]["ready"] is True
-    assert set(buckets["2026-01"]) == {"key", "count", "ready"}
+    assert set(buckets["2026-01"]) == {"key", "count", "ready", "state"}
+
+
+def test_calendar_returns_state(api):
+    c = api()
+    c.post("/api/streamers/jason/load")
+    wait_done(c)
+    bid = c.store.get_streamer("jason").broadcaster_id
+    c.store.upsert_clips(bid, [clip(1, 5, "2026-01-02T00:00:00Z")])
+    r = c.get("/api/streamers/jason/calendar?granularity=month&start=2025-12-01&end=2026-01-31")
+    buckets = {b["key"]: b for b in r.json()["buckets"]}
+    assert buckets["2026-01"]["state"] == "exact"
+    assert buckets["2025-12"]["state"] in ("exact", "approximate", "empty")
+    assert buckets["2026-01"]["ready"] == (buckets["2026-01"]["state"] == "exact")
+
+
+def test_years_endpoint_lists_account_years(api):
+    c = api()
+    c.post("/api/streamers/jason/load")
+    wait_done(c)
+    bid = c.store.get_streamer("jason").broadcaster_id
+    c.store.upsert_clips(bid, [clip(1, 5, "2021-03-02T00:00:00Z")])
+    r = c.get("/api/streamers/jason/years")
+    assert r.status_code == 200
+    years = r.json()["years"]
+    assert [y["year"] for y in years] == list(range(2020, datetime.now(timezone.utc).year + 1))
+    assert set(years[0]) == {"year", "enabled", "state", "clips"}
+    assert {y["year"]: y["clips"] for y in years}[2021] == 1
+    assert years[-1]["enabled"] is True
+
+
+def test_years_endpoint_unknown_streamer_404(api):
+    assert api().get("/api/streamers/jason/years").status_code == 404
 
 
 def test_calendar_unknown_streamer_404(api):

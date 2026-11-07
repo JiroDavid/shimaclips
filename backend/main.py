@@ -192,6 +192,14 @@ def _known_streamer(login: str, store: Store):
     return streamer
 
 
+@app.get("/api/streamers/{login}/years")
+def streamer_years(login: str, store: Store = Depends(get_store)):
+    streamer = _known_streamer(login, store)
+    current = datetime.now(timezone.utc).year
+    years = store.years_summary(streamer.broadcaster_id, streamer.account_created.year, current, current)
+    return {"years": [asdict(y) for y in years]}
+
+
 @app.get("/api/streamers/{login}/calendar")
 def streamer_calendar(login: str, start: date, end: date, granularity: str = "month",
                       store: Store = Depends(get_store)):

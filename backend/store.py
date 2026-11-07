@@ -44,6 +44,15 @@ class Bucket:
     key: str
     count: int
     ready: bool
+    state: str
+
+
+@dataclass
+class YearInfo:
+    year: int
+    enabled: bool
+    state: str
+    clips: int
 
 
 @dataclass
@@ -290,16 +299,40 @@ class Store:
                     (broadcaster_id, spans[0][1], spans[-1][2]),
                 )
             } if spans else {}
-            leaves = conn.execute(
-                'SELECT start, "end", has_data FROM windows '
-                "WHERE broadcaster_id = ? AND status != 'split'",
-                (broadcaster_id,),
-            ).fetchall()
+            leaves = self._leaves(conn, broadcaster_id)
         out = []
         for key, b_start, b_end in spans:
-            overlapping = [w for w in leaves if w["start"] < b_end and w["end"] > b_start]
-            ready = bool(overlapping) and all(w["has_data"] for w in overlapping)
-            out.append(Bucket(key, counts.get(key, 0), ready))
+            count = counts.get(key, 0)
+            state = _cell_state(leaves, b_start, b_end, count)
+            out.append(Bucket(key, count, state == "exact", state))
+        return out
+
+    @staticmethod
+    def _leaves(conn: sqlite3.Connection, broadcaster_id: str) -> list[sqlite3.Row]:
+        return conn.execute(
+            'SELECT start, "end", has_data, (status = \'done\' AND truncated = 1) AS capped '
+            "FROM windows WHERE broadcaster_id = ? AND status != 'split'",
+            (broadcaster_id,),
+        ).fetchall()
+
+    def years_summary(self, broadcaster_id: str, first_year: int, last_year: int,
+                      current_year: int) -> list[YearInfo]:
+        enabled = self.exact_years(broadcaster_id, current_year)
+        with closing(self._connect()) as conn:
+            leaves = self._leaves(conn, broadcaster_id)
+            clips = {
+                int(r["y"]): r["n"]
+                for r in conn.execute(
+                    "SELECT substr(created_at, 1, 4) AS y, COUNT(*) AS n FROM clips "
+                    "WHERE broadcaster_id = ? GROUP BY y",
+                    (broadcaster_id,),
+                )
+            }
+        out = []
+        for year in range(first_year, last_year + 1):
+            n = clips.get(year, 0)
+            state = _cell_state(leaves, f"{year:04d}-01-01T00:00:00Z", f"{year + 1:04d}-01-01T00:00:00Z", n)
+            out.append(YearInfo(year, year in enabled, state, n))
         return out
 
     def top_clips(self, broadcaster_id: str, start: date | None, end: date | None,
@@ -340,6 +373,13 @@ class Store:
                 "SELECT COUNT(*) FROM clips WHERE broadcaster_id = ?", (broadcaster_id,)
             ).fetchone()[0]
         return Progress(w["done"], w["total"], clips, w["capped"])
+
+
+def _cell_state(leaves: list[sqlite3.Row], span_start: str, span_end: str, count: int) -> str:
+    overlapping = [w for w in leaves if w["start"] < span_end and w["end"] > span_start]
+    if overlapping and all(w["has_data"] and not w["capped"] for w in overlapping):
+        return "exact"
+    return "approximate" if count > 0 else "empty"
 
 
 def _bucket_spans(start: date, end: date, granularity: str) -> list[tuple[str, str, str]]:
