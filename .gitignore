@@ -10,3 +10,6 @@ docs/superpowers/plans/
 AGENTS.md
 
 .superpowers/
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm

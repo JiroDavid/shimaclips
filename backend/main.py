@@ -8,14 +8,15 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from jobs import JobStore, job_to_dict, run_job
-from twitch import TwitchClient, TwitchError, top_clips
-from windows import month_window, range_window
+from loader import LoadManager, StreamerNotFound, normalize_login, state_to_dict
+from store import Store
+from twitch import TwitchClient, TwitchError
 
 load_dotenv(Path(__file__).parent / ".env")
 
@@ -43,27 +44,30 @@ def get_twitch() -> TwitchClient:
     return _twitch
 
 
-class SearchRequest(BaseModel):
-    streamer: str
-    count: int = Field(10, ge=1, le=200)
-    month: str | None = None
-    start: date | None = None
-    end: date | None = None
-
-    @field_validator("streamer")
-    @classmethod
-    def streamer_not_blank(cls, v: str) -> str:
-        if not v.strip().lstrip("@"):
-            raise ValueError("Streamer name is required")
-        return v
-
-    @model_validator(mode="after")
-    def has_window(self):
-        if not self.month and not (self.start and self.end):
-            raise ValueError("Provide a month, or both a start and end date")
-        return self
+_store: Store | None = None
+_manager: LoadManager | None = None
+_deps_lock = threading.Lock()
 
 
+def get_store() -> Store:
+    global _store
+    with _deps_lock:
+        if _store is None:
+            default = Path(__file__).parent / "shimaclips.db"
+            _store = Store(Path(os.environ.get("SHIMACLIPS_DB") or default))
+        return _store
+
+
+def get_manager() -> LoadManager:
+    global _manager
+    store = get_store()
+    with _deps_lock:
+        if _manager is None:
+            _manager = LoadManager(store, get_twitch)
+        return _manager
+
+
+MAX_CALENDAR_DAYS = 400
 ALLOWED_CLIP_HOSTS = {"clips.twitch.tv", "www.twitch.tv", "twitch.tv"}
 
 
@@ -86,20 +90,80 @@ class DownloadRequest(BaseModel):
     clips: list[ClipRef] = Field(min_length=1)
 
 
-@app.post("/api/clips/search")
-def search_clips(req: SearchRequest, twitch: TwitchClient = Depends(get_twitch)):
+@app.post("/api/streamers/{login}/load")
+def load_streamer(login: str, mode: str = "auto", manager: LoadManager = Depends(get_manager)):
+    if mode not in ("auto", "full"):
+        raise HTTPException(422, "mode must be 'auto' or 'full'")
     try:
-        start, end = month_window(req.month) if req.month else range_window(req.start, req.end)
-    except ValueError as e:
-        raise HTTPException(422, str(e))
+        normalize_login(login)
+    except ValueError:
+        raise HTTPException(422, "Streamer name must be 1-25 letters, numbers or underscores")
     try:
-        user_id = twitch.get_user_id(req.streamer)
-        if user_id is None:
-            raise HTTPException(404, f"Streamer '{req.streamer.strip().lstrip('@')}' not found")
-        clips = twitch.get_clips(user_id, start, end)
+        streamer, state = manager.ensure(login, mode)
+    except StreamerNotFound:
+        raise HTTPException(404, f"Streamer '{normalize_login(login)}' not found")
     except TwitchError as e:
         raise HTTPException(502, str(e))
-    return {"clips": [asdict(c) for c in top_clips(clips, req.count)], "total_in_window": len(clips)}
+    return {
+        "streamer": {
+            "login": streamer.login,
+            "display_name": streamer.display_name,
+            "account_created": streamer.account_created.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+        "state": state_to_dict(state),
+    }
+
+
+@app.get("/api/streamers/{login}/events")
+def streamer_events(login: str, manager: LoadManager = Depends(get_manager)):
+    if manager.state(login) is None:
+        raise HTTPException(404, "Unknown streamer")
+
+    def stream():
+        while True:
+            state = manager.state(login)
+            yield f"data: {json.dumps(state_to_dict(state))}\n\n"
+            if state.status in ("done", "error"):
+                return
+            time.sleep(0.5)
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+def _known_streamer(login: str, store: Store):
+    try:
+        login = normalize_login(login)
+    except ValueError:
+        raise HTTPException(404, "Unknown streamer")
+    streamer = store.get_streamer(login)
+    if streamer is None:
+        raise HTTPException(404, "Unknown streamer")
+    return streamer
+
+
+@app.get("/api/streamers/{login}/calendar")
+def streamer_calendar(login: str, start: date, end: date, granularity: str = "month",
+                      store: Store = Depends(get_store)):
+    if granularity not in ("month", "day"):
+        raise HTTPException(422, "granularity must be 'month' or 'day'")
+    if end < start:
+        raise HTTPException(422, "end must not be before start")
+    if (end - start).days > MAX_CALENDAR_DAYS:
+        raise HTTPException(422, f"Range must be at most {MAX_CALENDAR_DAYS} days")
+    streamer = _known_streamer(login, store)
+    buckets = store.bucket_counts(streamer.broadcaster_id, start, end, granularity)
+    return {"buckets": [asdict(b) for b in buckets]}
+
+
+@app.get("/api/streamers/{login}/clips")
+def streamer_clips(login: str, start: date | None = None, end: date | None = None,
+                   limit: int = Query(10, ge=1, le=100), offset: int = Query(0, ge=0),
+                   store: Store = Depends(get_store)):
+    if start is not None and end is not None and end < start:
+        raise HTTPException(422, "end must not be before start")
+    streamer = _known_streamer(login, store)
+    clips, total = store.top_clips(streamer.broadcaster_id, start, end, limit, offset)
+    return {"clips": [asdict(c) for c in clips], "total": total}
 
 
 def start_job(job, clips) -> None:

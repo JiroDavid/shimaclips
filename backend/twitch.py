@@ -51,10 +51,6 @@ def _retry_after(r: httpx.Response) -> float:
         return 1
 
 
-def top_clips(clips: list[Clip], n: int) -> list[Clip]:
-    return sorted(clips, key=lambda c: c.view_count, reverse=True)[:n]
-
-
 class TwitchClient:
     def __init__(self, client_id: str, client_secret: str, http: httpx.Client | None = None):
         self._client_id = client_id
@@ -104,11 +100,6 @@ class TwitchClient:
             raise TwitchError(f"Twitch API error ({r.status_code})")
         return r.json()
 
-    def get_user_id(self, login: str) -> str | None:
-        login = login.strip().lstrip("@").lower()
-        data = self._get("/users", {"login": login})["data"]
-        return data[0]["id"] if data else None
-
     def get_user(self, login: str) -> User | None:
         login = login.strip().lstrip("@").lower()
         data = self._get("/users", {"login": login})["data"]
@@ -117,9 +108,6 @@ class TwitchClient:
         u = data[0]
         created = datetime.fromisoformat(u["created_at"].replace("Z", "+00:00")).astimezone(timezone.utc)
         return User(id=u["id"], login=u["login"], display_name=u["display_name"], created_at=created)
-
-    def get_clips(self, broadcaster_id: str, start: datetime, end: datetime) -> list[Clip]:
-        return self._collect_clips(broadcaster_id, start, end)[:MAX_CLIPS]
 
     def fetch_window(self, broadcaster_id: str, start: datetime, end: datetime) -> ClipsResult:
         clips = self._collect_clips(broadcaster_id, start, end)[:MAX_CLIPS]

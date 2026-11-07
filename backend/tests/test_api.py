@@ -1,86 +1,166 @@
 import json
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 import main
-from twitch import Clip, TwitchError
+from loader import LoadManager
+from store import Store
+from twitch import Clip, ClipsResult, TwitchError, User
+
+
+CREATED = datetime(2020, 1, 1, tzinfo=timezone.utc)
 
 
 class FakeTwitch:
-    def __init__(self, user="42", clips=None, error=None):
-        self.user, self.clips, self.error = user, clips or [], error
-        self.window = None
+    def __init__(self, logins=("jason",), error=None):
+        self.users = {l: User(str(i + 1), l, l.title(), CREATED) for i, l in enumerate(logins)}
+        self.error = error
 
-    def get_user_id(self, login):
+    def get_user(self, login):
         if self.error:
             raise self.error
-        return self.user
+        return self.users.get(login)
 
-    def get_clips(self, broadcaster_id, start, end):
-        self.window = (start, end)
-        return self.clips
+    def fetch_window(self, broadcaster_id, start, end):
+        return ClipsResult([], False)
 
 
-def clip(i, views):
-    return Clip(f"c{i}", f"https://clips.twitch.tv/c{i}", f"clip {i}", "t.jpg", views, 10.0, "x", "d")
+def clip(i, views, created="2026-01-02T00:00:00Z"):
+    return Clip(f"c{i}", f"https://clips.twitch.tv/c{i}", f"clip {i}", "t.jpg", views, 10.0, "x", created)
 
 
 @pytest.fixture
-def api():
-    def make(fake):
-        main.app.dependency_overrides[main.get_twitch] = lambda: fake
-        return TestClient(main.app)
+def api(tmp_path):
+    managers = []
+
+    def make(fake=None):
+        store = Store(tmp_path / "api.db")
+        mgr = LoadManager(store, lambda: fake or FakeTwitch())
+        managers.append(mgr)
+        main.app.dependency_overrides[main.get_store] = lambda: store
+        main.app.dependency_overrides[main.get_manager] = lambda: mgr
+        c = TestClient(main.app)
+        c.store, c.mgr = store, mgr
+        return c
 
     yield make
+    for m in managers:
+        m.shutdown()
     main.app.dependency_overrides.clear()
 
 
-def test_search_returns_top_n_sorted(api):
-    fake = FakeTwitch(clips=[clip(1, 5), clip(2, 50), clip(3, 20)])
-    r = api(fake).post("/api/clips/search", json={"streamer": "jason", "month": "2026-01", "count": 2})
+def wait_done(c, login="jason"):
+    end = time.monotonic() + 5
+    while time.monotonic() < end:
+        st = c.mgr.state(login)
+        if st and st.status in ("done", "error"):
+            return st
+        time.sleep(0.01)
+    raise AssertionError("load did not finish")
+
+
+def test_load_returns_streamer_and_state(api):
+    r = api().post("/api/streamers/@Jason/load")
     assert r.status_code == 200
     body = r.json()
-    assert [c["view_count"] for c in body["clips"]] == [50, 20]
-    assert body["total_in_window"] == 3
-    assert fake.window[0].isoformat() == "2026-01-01T00:00:00+00:00"
+    assert body["streamer"] == {"login": "jason", "display_name": "Jason", "account_created": "2020-01-01T00:00:00Z"}
+    assert set(body["state"]) == {"status", "error", "windows_done", "windows_total", "clips", "capped", "started_at"}
 
 
-def test_search_empty_window_is_ok(api):
-    r = api(FakeTwitch(clips=[])).post("/api/clips/search", json={"streamer": "j", "month": "2026-01"})
-    assert r.status_code == 200
-    assert r.json() == {"clips": [], "total_in_window": 0}
-
-
-def test_search_custom_range(api):
-    fake = FakeTwitch(clips=[clip(1, 1)])
-    r = api(fake).post("/api/clips/search", json={"streamer": "j", "start": "2026-01-05", "end": "2026-01-06"})
-    assert r.status_code == 200
-    assert fake.window[1].isoformat() == "2026-01-07T00:00:00+00:00"
-
-
-def test_search_unknown_streamer_404(api):
-    r = api(FakeTwitch(user=None)).post("/api/clips/search", json={"streamer": "nobody", "month": "2026-01"})
+def test_load_unknown_streamer_404(api):
+    r = api().post("/api/streamers/nobody/load")
     assert r.status_code == 404
-    assert "nobody" in r.json()["detail"]
+    assert r.json()["detail"] == "Streamer 'nobody' not found"
 
 
-def test_search_twitch_error_502(api):
-    r = api(FakeTwitch(error=TwitchError("boom"))).post("/api/clips/search", json={"streamer": "j", "month": "2026-01"})
+@pytest.mark.parametrize("login", ["a-b", "a" * 30])
+def test_load_rejects_bad_login_422(api, login):
+    assert api().post(f"/api/streamers/{login}/load").status_code == 422
+
+
+def test_load_rejects_bad_mode_422(api):
+    assert api().post("/api/streamers/jason/load?mode=weird").status_code == 422
+
+
+def test_load_twitch_failure_502(api):
+    r = api(FakeTwitch(error=TwitchError("boom"))).post("/api/streamers/jason/load")
     assert r.status_code == 502
     assert r.json()["detail"] == "boom"
 
 
-@pytest.mark.parametrize("body", [
-    {"streamer": "j"},
-    {"streamer": "j", "month": "2026-13"},
-    {"streamer": "j", "month": "2026-01", "count": 0},
-    {"streamer": "j", "start": "2026-01-10", "end": "2026-01-01"},
-    {"streamer": "  ", "month": "2026-01"},
+def test_calendar_zero_fills_and_flags_ready(api):
+    c = api()
+    c.post("/api/streamers/jason/load")
+    wait_done(c)
+    bid = c.store.get_streamer("jason").broadcaster_id
+    c.store.upsert_clips(bid, [clip(1, 5, "2026-01-02T00:00:00Z"), clip(2, 6, "2026-01-03T00:00:00Z")])
+    r = c.get("/api/streamers/jason/calendar?granularity=month&start=2025-12-01&end=2026-02-28")
+    assert r.status_code == 200
+    buckets = {b["key"]: b for b in r.json()["buckets"]}
+    assert list(buckets) == ["2025-12", "2026-01", "2026-02"]
+    assert buckets["2025-12"]["count"] == 0
+    assert buckets["2026-01"]["count"] == 2
+    assert buckets["2026-01"]["ready"] is True
+    assert set(buckets["2026-01"]) == {"key", "count", "ready"}
+
+
+def test_calendar_unknown_streamer_404(api):
+    r = api().get("/api/streamers/jason/calendar?granularity=day&start=2026-01-01&end=2026-01-02")
+    assert r.status_code == 404
+
+
+@pytest.mark.parametrize("query", [
+    "granularity=day&start=2026-01-10&end=2026-01-01",
+    "granularity=day&start=2025-01-01&end=2026-02-06",
+    "granularity=week&start=2026-01-01&end=2026-01-02",
+    "granularity=day&start=nope&end=2026-01-02",
 ])
-def test_search_invalid_input_422(api, body):
-    assert api(FakeTwitch()).post("/api/clips/search", json=body).status_code == 422
+def test_calendar_rejects_inverted_or_oversized_range(api, query):
+    c = api()
+    c.post("/api/streamers/jason/load")
+    assert c.get(f"/api/streamers/jason/calendar?{query}").status_code == 422
+
+
+def test_clips_sorted_by_views_with_total_and_offset(api):
+    c = api()
+    c.post("/api/streamers/jason/load")
+    wait_done(c)
+    bid = c.store.get_streamer("jason").broadcaster_id
+    c.store.upsert_clips(bid, [clip(1, 5), clip(2, 50), clip(3, 20), clip(4, 1, "2026-03-01T00:00:00Z")])
+    r = c.get("/api/streamers/jason/clips?start=2026-01-01&end=2026-01-31&limit=2")
+    body = r.json()
+    assert [x["view_count"] for x in body["clips"]] == [50, 20]
+    assert body["total"] == 3
+    assert set(body["clips"][0]) == {"id", "url", "title", "thumbnail_url", "view_count", "duration", "creator_name", "created_at"}
+    r = c.get("/api/streamers/jason/clips?start=2026-01-01&end=2026-01-31&limit=2&offset=2")
+    assert [x["view_count"] for x in r.json()["clips"]] == [5]
+    assert len(c.get("/api/streamers/jason/clips").json()["clips"]) == 4
+
+
+@pytest.mark.parametrize("query", ["limit=0", "limit=101", "offset=-1", "start=2026-02-01&end=2026-01-01"])
+def test_clips_rejects_bad_params(api, query):
+    c = api()
+    c.post("/api/streamers/jason/load")
+    assert c.get(f"/api/streamers/jason/clips?{query}").status_code == 422
+
+
+def test_clips_unknown_streamer_404(api):
+    assert api().get("/api/streamers/jason/clips").status_code == 404
+
+
+def test_events_streams_until_done(api):
+    c = api()
+    c.post("/api/streamers/jason/load")
+    text = c.get("/api/streamers/jason/events").text
+    assert last_event(text)["status"] == "done"
+
+
+def test_events_never_loaded_404(api):
+    assert api().get("/api/streamers/jason/events").status_code == 404
 
 
 def fake_start_job(fail_urls=()):
