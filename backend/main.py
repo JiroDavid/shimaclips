@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from jobs import JobStore, job_to_dict, run_job
+from live import LiveClips
 from loader import LoadManager, LoaderUnavailable, StreamerNotFound, normalize_login, state_to_dict
 from store import Store
 from twitch import TwitchClient, TwitchError
@@ -58,6 +59,7 @@ def get_twitch() -> TwitchClient:
 
 _store: Store | None = None
 _manager: LoadManager | None = None
+_live: LiveClips | None = None
 _deps_lock = threading.Lock()
 
 
@@ -77,6 +79,15 @@ def get_manager() -> LoadManager:
         if _manager is None:
             _manager = LoadManager(store, get_twitch)
         return _manager
+
+
+def get_live() -> LiveClips:
+    global _live
+    store = get_store()
+    with _deps_lock:
+        if _live is None:
+            _live = LiveClips(store, get_twitch)
+        return _live
 
 
 MAX_CALENDAR_DAYS = 400
@@ -217,12 +228,29 @@ def streamer_calendar(login: str, start: date, end: date, granularity: str = "mo
 @app.get("/api/streamers/{login}/clips")
 def streamer_clips(login: str, start: date | None = None, end: date | None = None,
                    limit: int = Query(10, ge=1, le=100), offset: int = Query(0, ge=0),
-                   store: Store = Depends(get_store)):
+                   sort: str = "views", store: Store = Depends(get_store),
+                   live: LiveClips = Depends(get_live)):
     if start is not None and end is not None and end < start:
         raise HTTPException(422, "end must not be before start")
+    if sort not in ("views", "newest"):
+        raise HTTPException(422, "sort must be 'views' or 'newest'")
     streamer = _known_streamer(login, store)
-    clips, total = store.top_clips(streamer.broadcaster_id, start, end, limit, offset)
-    return {"clips": [asdict(c) for c in clips], "total": total}
+    bid = streamer.broadcaster_id
+    today = datetime.now(timezone.utc).date()
+    if sort == "newest" and not store.range_exact(bid, start, end, streamer.account_created.date(), today):
+        raise HTTPException(422, "Newest first needs a fully loaded period")
+    try:
+        exact = live.ensure(streamer, start, end, offset + limit, today)
+    except TwitchError as e:
+        if store.top_clips(bid, start, end, 1, 0)[1] == 0:
+            raise HTTPException(502, str(e))
+        exact = False
+    clips, total = store.top_clips(bid, start, end, limit, offset, sort)
+    if exact:
+        has_more = offset + len(clips) < total
+    else:
+        has_more = len(clips) == limit and offset + limit < 1000
+    return {"clips": [asdict(c) for c in clips], "total": total, "exact": exact, "has_more": has_more}
 
 
 def start_job(job, clips) -> None:

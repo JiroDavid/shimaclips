@@ -425,3 +425,38 @@ def test_years_summary_capped_leaf_is_approximate(tmp_path):
     s.upsert_clips("1", [clip("a", "2024-03-01T05:30:00Z")])
     (y,) = s.years_summary("1", 2024, 2024, 2026)
     assert y.state == "approximate"
+
+
+def test_range_exact_requires_every_month_exact(tmp_path):
+    s = make(tmp_path)
+    s.add_windows("1", [(dt(2026, 1, 1), dt(2026, 2, 1)), (dt(2026, 2, 1), dt(2026, 3, 1))])
+    s.mark_done("1", dt(2026, 1, 1), dt(2026, 2, 1), dt(2026, 4, 1), False)
+    created, today = date(2020, 1, 1), date(2026, 2, 20)
+    assert s.range_exact("1", date(2026, 1, 5), date(2026, 1, 20), created, today) is True
+    assert s.range_exact("1", date(2026, 1, 5), date(2026, 2, 20), created, today) is False
+    s.mark_done("1", dt(2026, 2, 1), dt(2026, 3, 1), dt(2026, 4, 1), False)
+    assert s.range_exact("1", date(2026, 1, 5), date(2026, 2, 20), created, today) is True
+
+
+def test_range_exact_clamps_to_account_and_today(tmp_path):
+    s = make(tmp_path)
+    created, today = date(2026, 1, 10), date(2026, 1, 20)
+    assert s.range_exact("1", date(2025, 1, 1), date(2025, 6, 1), created, today) is True
+    assert s.range_exact("1", date(2026, 2, 1), None, created, today) is True
+    assert s.range_exact("1", None, None, created, today) is False
+
+
+def test_top_clips_newest_orders_by_created_at(tmp_path):
+    s = make(tmp_path)
+    s.upsert_clips("1", [
+        clip("a", "2026-01-01T00:00:00Z", 50),
+        clip("b", "2026-01-03T00:00:00Z", 1),
+        clip("c", "2026-01-02T00:00:00Z", 9),
+    ])
+    clips, _ = s.top_clips("1", None, None, 10, 0, sort="newest")
+    assert [c.id for c in clips] == ["b", "c", "a"]
+    clips, _ = s.top_clips("1", None, None, 10, 0)
+    assert [c.id for c in clips] == ["a", "c", "b"]
+    import pytest
+    with pytest.raises(ValueError):
+        s.top_clips("1", None, None, 10, 0, sort="oldest")

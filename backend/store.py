@@ -335,8 +335,20 @@ class Store:
             out.append(YearInfo(year, year in enabled, state, n))
         return out
 
+    def range_exact(self, broadcaster_id: str, start: date | None, end: date | None,
+                    account_created: date, today: date) -> bool:
+        lo = max(start or account_created, account_created)
+        hi = min(end or today, today)
+        if hi < lo:
+            return True
+        buckets = self.bucket_counts(broadcaster_id, lo, hi, "month")
+        return all(b.state == "exact" for b in buckets)
+
     def top_clips(self, broadcaster_id: str, start: date | None, end: date | None,
-                  limit: int, offset: int) -> tuple[list[Clip], int]:
+                  limit: int, offset: int, sort: str = "views") -> tuple[list[Clip], int]:
+        orders = {"views": "view_count DESC, id", "newest": "created_at DESC, id"}
+        if sort not in orders:
+            raise ValueError(f"Unknown sort: {sort}")
         where = "broadcaster_id = ?"
         args: list = [broadcaster_id]
         if start is not None:
@@ -348,7 +360,7 @@ class Store:
         with closing(self._connect()) as conn:
             total = conn.execute(f"SELECT COUNT(*) FROM clips WHERE {where}", args).fetchone()[0]
             rows = conn.execute(
-                f"SELECT * FROM clips WHERE {where} ORDER BY view_count DESC, id LIMIT ? OFFSET ?",
+                f"SELECT * FROM clips WHERE {where} ORDER BY {orders[sort]} LIMIT ? OFFSET ?",
                 [*args, limit, offset],
             ).fetchall()
         clips = [

@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
+from live import LiveClips
 from loader import LoadManager
 from store import Store
 from twitch import ChannelHit, Clip, ClipsResult, TwitchError, User
@@ -16,7 +17,10 @@ CREATED = datetime(2020, 1, 1, tzinfo=timezone.utc)
 
 
 class FakeTwitch:
-    def __init__(self, logins=("jason",), error=None, hits=()):
+    def __init__(self, logins=("jason",), error=None, hits=(), top=(), top_error=None):
+        self.top = list(top)
+        self.top_error = top_error
+        self.top_calls = []
         self.hits = list(hits)
         self.searched = []
         self.users = {l: User(str(i + 1), l, l.title(), CREATED) for i, l in enumerate(logins)}
@@ -29,6 +33,12 @@ class FakeTwitch:
 
     def fetch_window(self, broadcaster_id, start, end):
         return ClipsResult([], False)
+
+    def fetch_top(self, broadcaster_id, start, end, limit):
+        self.top_calls.append((broadcaster_id, start, end, limit))
+        if self.top_error:
+            raise self.top_error
+        return self.top[:limit]
 
     def search_channels(self, query, limit=8):
         if self.error:
@@ -51,6 +61,8 @@ def api(tmp_path):
         managers.append(mgr)
         main.app.dependency_overrides[main.get_store] = lambda: store
         main.app.dependency_overrides[main.get_manager] = lambda: mgr
+        live = LiveClips(store, lambda: fake or FakeTwitch())
+        main.app.dependency_overrides[main.get_live] = lambda: live
         c = TestClient(main.app)
         c.store, c.mgr = store, mgr
         return c
@@ -356,3 +368,73 @@ def test_put_year_toggles_and_validates(api):
     assert c.put(f"/api/streamers/jason/years/{now_year + 2}", json={"enabled": True}).status_code == 422
     assert c.put(f"/api/streamers/jason/years/{now_year + 1}", json={"enabled": True}).status_code == 200
     assert c.put("/api/streamers/jason/years/2019", json={}).status_code == 422
+
+
+def seed_exact_month(c, bid, start, end):
+    c.store.add_windows(bid, [(start, end)])
+    c.store.mark_done(bid, start, end, end, False)
+
+
+def test_clips_live_fetch_marks_exact_false(api):
+    fake = FakeTwitch(top=[clip(1, 50), clip(2, 20)])
+    c = api(fake)
+    c.store.upsert_streamer(User("1", "jason", "Jason", CREATED))
+    r = c.get("/api/streamers/jason/clips?start=2026-01-01&end=2026-01-31&limit=2")
+    body = r.json()
+    assert r.status_code == 200
+    assert body["exact"] is False
+    assert [x["view_count"] for x in body["clips"]] == [50, 20]
+    assert body["total"] == 2
+    assert body["has_more"] is True
+    assert len(fake.top_calls) == 1
+
+
+def test_clips_newest_requires_exact_422(api):
+    fake = FakeTwitch(top=[clip(1, 50)])
+    c = api(fake)
+    c.store.upsert_streamer(User("1", "jason", "Jason", CREATED))
+    r = c.get("/api/streamers/jason/clips?start=2026-01-01&end=2026-01-31&sort=newest")
+    assert r.status_code == 422
+    assert r.json()["detail"] == "Newest first needs a fully loaded period"
+    assert fake.top_calls == []
+    assert c.get("/api/streamers/jason/clips?sort=bogus").status_code == 422
+
+
+def test_clips_newest_when_exact(api):
+    fake = FakeTwitch()
+    c = api(fake)
+    c.store.upsert_streamer(User("1", "jason", "Jason", CREATED))
+    bid = c.store.get_streamer("jason").broadcaster_id
+    seed_exact_month(c, bid, datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 2, 1, tzinfo=timezone.utc))
+    c.store.upsert_clips(bid, [clip(1, 50, "2026-01-01T00:00:00Z"), clip(2, 1, "2026-01-05T00:00:00Z")])
+    r = c.get("/api/streamers/jason/clips?start=2026-01-01&end=2026-01-31&sort=newest")
+    body = r.json()
+    assert body["exact"] is True
+    assert [x["id"] for x in body["clips"]] == ["c2", "c1"]
+    assert body["has_more"] is False
+    assert fake.top_calls == []
+
+
+def test_clips_tick_refetch_hits_twitch_once(api):
+    fake = FakeTwitch(top=[clip(1, 50)])
+    c = api(fake)
+    c.store.upsert_streamer(User("1", "jason", "Jason", CREATED))
+    for _ in range(3):
+        assert c.get("/api/streamers/jason/clips?start=2026-01-01&end=2026-01-31&limit=10").status_code == 200
+    assert len(fake.top_calls) == 1
+
+
+def test_clips_twitch_error_serves_cached_when_present(api):
+    fake = FakeTwitch(top_error=TwitchError("boom"))
+    c = api(fake)
+    c.store.upsert_streamer(User("1", "jason", "Jason", CREATED))
+    url = "/api/streamers/jason/clips?start=2026-01-01&end=2026-01-31"
+    r = c.get(url)
+    assert r.status_code == 502
+    assert r.json()["detail"] == "boom"
+    bid = c.store.get_streamer("jason").broadcaster_id
+    c.store.upsert_clips(bid, [clip(1, 50)])
+    r = c.get(url)
+    assert r.status_code == 200
+    assert r.json()["exact"] is False
+    assert len(r.json()["clips"]) == 1
