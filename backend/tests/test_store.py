@@ -65,16 +65,16 @@ def test_bucket_not_ready_while_any_overlapping_leaf_pending(tmp_path):
     s.add_windows("1", [(dt(2026, 1, 1), dt(2026, 1, 16)), (dt(2026, 1, 16), dt(2026, 2, 1))])
     s.mark_done("1", dt(2026, 1, 1), dt(2026, 1, 16), dt(2026, 3, 1), False)
     b = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")[0]
-    assert b.ready is False
+    assert b.state != "exact"
     s.mark_done("1", dt(2026, 1, 16), dt(2026, 2, 1), dt(2026, 3, 1), False)
     b = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")[0]
-    assert b.ready is True
+    assert b.state == "exact"
 
 
 def test_bucket_not_ready_with_no_windows(tmp_path):
     s = make(tmp_path)
     b = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "day")[0]
-    assert b.ready is False
+    assert b.state != "exact"
 
 
 def test_split_parent_is_not_a_leaf(tmp_path):
@@ -84,9 +84,9 @@ def test_split_parent_is_not_a_leaf(tmp_path):
         (dt(2026, 1, 1), dt(2026, 1, 2)), (dt(2026, 1, 2), dt(2026, 1, 3))
     ])
     day = lambda: s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "day")[0]
-    assert day().ready is False
+    assert day().state != "exact"
     s.mark_done("1", dt(2026, 1, 1), dt(2026, 1, 2), dt(2026, 3, 1), False)
-    assert day().ready is True
+    assert day().state == "exact"
     p = s.progress("1")
     assert p.windows_total == 2 and p.windows_done == 1
 
@@ -157,9 +157,9 @@ def test_reset_keeps_buckets_ready(tmp_path):
     s.reset_windows("1", "all", dt(2026, 1, 21), timedelta(days=2))
     assert s.progress("1").windows_done == 0
     (b,) = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")
-    assert b.ready is True
+    assert b.state == "exact"
     (d,) = s.bucket_counts("1", date(2026, 1, 5), date(2026, 1, 5), "day")
-    assert d.ready is True
+    assert d.state == "exact"
 
 
 def test_split_children_make_bucket_not_ready_until_fetched(tmp_path):
@@ -170,9 +170,9 @@ def test_split_children_make_bucket_not_ready_until_fetched(tmp_path):
     s.reset_windows("1", "all", dt(2026, 1, 21), timedelta(days=2))
     s.mark_split("1", *month, [(dt(2026, 1, d), dt(2026, 1, d + 1)) for d in range(1, 31)] + [(dt(2026, 1, 31), dt(2026, 2, 1))])
     day = lambda: s.bucket_counts("1", date(2026, 1, 5), date(2026, 1, 5), "day")[0]
-    assert day().ready is False
+    assert day().state != "exact"
     s.mark_done("1", dt(2026, 1, 5), dt(2026, 1, 6), dt(2026, 1, 21), False)
-    assert day().ready is True
+    assert day().state == "exact"
 
 
 def test_split_windows_lists_split_parents(tmp_path):
@@ -225,12 +225,12 @@ def test_old_database_resets_done_leaves_once_and_keeps_clips(tmp_path):
     p = s.progress("1")
     assert p.windows_done == 0 and p.windows_total == 3 and p.capped == 0 and p.clips == 1
     (b,) = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")
-    assert b.count == 1 and b.ready is False
+    assert b.count == 1 and b.state != "exact"
     assert s.split_windows("1") == [(dt(2026, 2, 1), dt(2026, 3, 1))]
     s.mark_done("1", dt(2026, 1, 1), dt(2026, 2, 1), dt(2026, 11, 1), False)
     s2 = Store(path)
     assert s2.progress("1").windows_done == 1
-    assert s2.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")[0].ready is True
+    assert s2.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")[0].state == "exact"
 
 
 def test_fresh_database_starts_at_current_version(tmp_path):
@@ -349,7 +349,7 @@ def test_bucket_state_exact_when_all_leaves_fetched_and_not_truncated(tmp_path):
     s.add_windows("1", [(dt(2026, 1, 1), dt(2026, 2, 1))])
     s.mark_done("1", dt(2026, 1, 1), dt(2026, 2, 1), dt(2026, 3, 1), False)
     b = _state(s)
-    assert (b.state, b.ready, b.count) == ("exact", True, 1)
+    assert (b.state, b.count) == ("exact", 1)
 
 
 def test_bucket_state_approximate_when_a_child_window_is_pending(tmp_path):
@@ -360,7 +360,7 @@ def test_bucket_state_approximate_when_a_child_window_is_pending(tmp_path):
     s.upsert_clips("1", [clip("a", "2026-01-02T00:00:00Z")])
     s.mark_split("1", *month, [(dt(2026, 1, 1), dt(2026, 1, 16)), (dt(2026, 1, 16), dt(2026, 2, 1))])
     b = _state(s)
-    assert (b.state, b.ready, b.count) == ("approximate", False, 1)
+    assert (b.state, b.count) == ("approximate", 1)
 
 
 def test_bucket_state_approximate_when_leaf_truncated(tmp_path):
@@ -390,7 +390,7 @@ def test_exact_bucket_with_zero_clips_is_exact(tmp_path):
     s.add_windows("1", [(dt(2026, 1, 1), dt(2026, 2, 1))])
     s.mark_done("1", dt(2026, 1, 1), dt(2026, 2, 1), dt(2026, 3, 1), False)
     b = _state(s)
-    assert (b.state, b.ready, b.count) == ("exact", True, 0)
+    assert (b.state, b.count) == ("exact", 0)
 
 
 def test_years_summary_states_and_enabled_flags(tmp_path):
@@ -520,3 +520,10 @@ def test_version_3_database_gets_watchlist_tables(tmp_path):
     assert s2.progress("1").windows_done == 1
     assert s2.watch_list() == []
     assert s2.seed_watchlist_once(["a"]) is True
+
+
+def test_bucket_has_no_ready_field(tmp_path):
+    s = make(tmp_path)
+    b = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")[0]
+    assert not hasattr(b, "ready")
+    assert b.state in ("exact", "approximate", "empty")

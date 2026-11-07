@@ -1,3 +1,5 @@
+import type { Bucket } from "@/lib/api";
+
 export type View = "year" | "month" | "week";
 
 const DAY_MS = 86400000;
@@ -61,9 +63,9 @@ export function isCellDisabled(
   cellEnd: string,
   accountCreated: string,
   today: string,
-  ready: boolean,
+  state: Bucket["state"] | undefined,
 ): boolean {
-  return !ready || cellStart > today || cellEnd < accountCreated;
+  return state === undefined || state === "empty" || cellStart > today || cellEnd < accountCreated;
 }
 
 const MONTH_NAMES = [

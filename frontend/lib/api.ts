@@ -87,7 +87,7 @@ export type LoadState = {
   started_at: number;
 };
 
-export type Bucket = { key: string; count: number; ready: boolean };
+export type Bucket = { key: string; count: number; state: "exact" | "approximate" | "empty" };
 
 export async function loadStreamer(
   login: string,

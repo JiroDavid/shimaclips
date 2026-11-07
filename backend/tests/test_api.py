@@ -113,7 +113,7 @@ def test_load_twitch_failure_502(api):
     assert r.json()["detail"] == "boom"
 
 
-def test_calendar_zero_fills_and_flags_ready(api):
+def test_calendar_zero_fills_and_has_state(api):
     c = api()
     c.post("/api/streamers/jason/load")
     wait_done(c)
@@ -125,8 +125,9 @@ def test_calendar_zero_fills_and_flags_ready(api):
     assert list(buckets) == ["2025-12", "2026-01", "2026-02"]
     assert buckets["2025-12"]["count"] == 0
     assert buckets["2026-01"]["count"] == 2
-    assert buckets["2026-01"]["ready"] is True
-    assert set(buckets["2026-01"]) == {"key", "count", "ready", "state"}
+    assert buckets["2026-01"]["state"] == "exact"
+    assert "ready" not in buckets["2026-01"]
+    assert set(buckets["2026-01"]) == {"key", "count", "state"}
 
 
 def test_calendar_returns_state(api):
@@ -139,7 +140,6 @@ def test_calendar_returns_state(api):
     buckets = {b["key"]: b for b in r.json()["buckets"]}
     assert buckets["2026-01"]["state"] == "exact"
     assert buckets["2025-12"]["state"] in ("exact", "approximate", "empty")
-    assert buckets["2026-01"]["ready"] == (buckets["2026-01"]["state"] == "exact")
 
 
 def test_years_endpoint_lists_account_years(api):

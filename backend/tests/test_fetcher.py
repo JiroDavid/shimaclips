@@ -85,7 +85,7 @@ def test_capped_window_is_split_and_children_fetched(tmp_path):
     assert p.windows_total == 28 and p.windows_done == 28 and p.capped == 0
     assert p.clips == 2
     b = store.bucket_counts("1", date(2026, 2, 1), date(2026, 2, 28), "day")
-    assert all(x.ready for x in b)
+    assert all(x.state == "exact" for x in b)
 
 
 def test_capped_hour_is_marked_truncated_not_dropped(tmp_path):
@@ -146,7 +146,7 @@ def test_account_created_this_month_yields_one_window_and_zero_clips_is_ready(tm
     assert store.progress("1").windows_total == 1
     run_fetch(store, FakeTwitch(), "1")
     (b,) = store.bucket_counts("1", date(2026, 3, 1), date(2026, 3, 31), "month")
-    assert b.ready and b.count == 0
+    assert b.state == "exact" and b.count == 0
 
 
 def test_refetching_clips_does_not_double_count(tmp_path):
@@ -210,7 +210,7 @@ def test_silently_capped_month_splits_to_days_and_hours_and_counts_exactly(tmp_p
     assert (dt(2026, 2, 3, 5), dt(2026, 2, 3, 6)) in twitch.calls
     assert (dt(2026, 2, 4, 5), dt(2026, 2, 4, 6)) not in twitch.calls
     feb3 = store.bucket_counts("1", date(2026, 2, 3), date(2026, 2, 3), "day")[0]
-    assert feb3.count == 2400 and feb3.ready
+    assert feb3.count == 2400 and feb3.state == "exact"
 
 
 def test_window_below_threshold_is_not_split(tmp_path):

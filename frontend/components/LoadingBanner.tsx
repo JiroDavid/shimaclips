@@ -39,6 +39,11 @@ export default function LoadingBanner({
             <div className="h-full bg-purple-600 transition-all duration-500" style={{ width: `${pct}%` }} />
           </div>
           <p className="text-xs text-zinc-400">{(state?.clips ?? 0).toLocaleString()} clips loaded</p>
+          {state && (state.status === "queued" || state.status === "running") && (
+            <p className="text-xs text-zinc-400">
+              Clips and the approximate calendar are usable now - exact counts keep loading
+            </p>
+          )}
         </div>
       )}
       {state && state.capped > 0 && (

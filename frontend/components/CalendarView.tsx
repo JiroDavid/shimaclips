@@ -30,6 +30,7 @@ const LEVEL_CLASS = [
 
 const DISABLED_CLASS = "cursor-not-allowed bg-zinc-700 opacity-50";
 const FUTURE_CLASS = "cursor-not-allowed bg-zinc-900 opacity-40";
+const APPROX_CLASS = "border border-dashed border-zinc-400/60";
 
 type Cell = {
   key: string;
@@ -124,16 +125,22 @@ export default function CalendarView({ login, tick, accountCreated, selectedKey,
 
   const state = cells.map((c) => {
     const b = byKey.get(c.key);
-    const ready = b?.ready ?? false;
+    const bucketState = b?.state;
     const count = b?.count ?? 0;
     const dateDisabled = c.start > today || c.end < created;
-    return { cell: c, ready, count, dateDisabled, disabled: isCellDisabled(c.start, c.end, created, today, ready) };
+    return {
+      cell: c,
+      bucketState,
+      count,
+      dateDisabled,
+      disabled: isCellDisabled(c.start, c.end, created, today, bucketState),
+    };
   });
 
   const active = state.filter((s) => !s.disabled);
   const max = active.reduce((m, s) => Math.max(m, s.count), 0);
-  const allReady = state.every((s) => s.ready || s.dateDisabled);
-  const empty = allReady && active.length > 0 && max === 0;
+  const allExact = state.every((s) => s.bucketState === "exact" || s.dateDisabled);
+  const empty = allExact && active.length > 0 && max === 0;
 
   let title = "";
   let canPrev = false;
@@ -163,7 +170,10 @@ export default function CalendarView({ login, tick, accountCreated, selectedKey,
 
   function describe(s: (typeof state)[number]): string {
     if (s.dateDisabled) return `${s.cell.aria}, outside the account lifetime`;
-    if (!s.ready) return `${s.cell.aria}, not loaded yet`;
+    if (s.bucketState === "approximate") {
+      return `${s.cell.aria}, about ${s.count.toLocaleString()} clips so far - approximate, still loading exact counts`;
+    }
+    if (s.bucketState !== "exact") return `${s.cell.aria}, not loaded yet`;
     return `${s.cell.aria}, ${s.count} ${s.count === 1 ? "clip" : "clips"}`;
   }
 
@@ -171,7 +181,16 @@ export default function CalendarView({ login, tick, accountCreated, selectedKey,
     const selected = selectedKey === s.cell.key;
     const level = heatLevel(s.count, max);
     const tone = s.disabled ? (s.dateDisabled ? FUTURE_CLASS : DISABLED_CLASS) : LEVEL_CLASS[level];
-    const countText = s.dateDisabled ? "-" : s.ready ? String(s.count) : big ? "loading" : "";
+    const approximate = s.bucketState === "approximate" && !s.disabled;
+    const countText = s.dateDisabled
+      ? "-"
+      : approximate
+        ? `${s.count.toLocaleString()}+`
+        : s.bucketState === "exact"
+          ? String(s.count)
+          : big
+            ? "loading"
+            : "";
     return (
       <button
         key={s.cell.key}
@@ -179,9 +198,9 @@ export default function CalendarView({ login, tick, accountCreated, selectedKey,
         disabled={s.disabled}
         aria-label={describe(s)}
         aria-pressed={selected}
-        title={!s.disabled && s.count === 0 ? "no clips" : undefined}
+        title={approximate ? describe(s) : !s.disabled && s.count === 0 ? "no clips" : undefined}
         onClick={() => onSelect(selected ? null : s.cell.key)}
-        className={`flex flex-col items-center justify-center rounded-lg p-2 ${big ? "min-h-16" : "min-h-12"} ${tone} ${
+        className={`flex flex-col items-center justify-center rounded-lg p-2 ${big ? "min-h-16" : "min-h-12"} ${tone} ${approximate ? APPROX_CLASS : ""} ${
           selected ? "ring-2 ring-white ring-offset-2 ring-offset-zinc-950" : ""
         }`}
       >
@@ -242,6 +261,8 @@ export default function CalendarView({ login, tick, accountCreated, selectedKey,
           <span key={l} className={`inline-block h-3 w-3 rounded-sm ${LEVEL_CLASS[l].split(" ")[0]}`} />
         ))}
         <span>more</span>
+        <span className={`ml-2 inline-block h-3 w-3 rounded-sm bg-zinc-800 ${APPROX_CLASS}`} />
+        <span>approximate</span>
       </div>
     </section>
   );

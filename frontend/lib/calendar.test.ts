@@ -62,16 +62,18 @@ describe("calendar", () => {
     expect(todayUtc(new Date("2026-01-01T00:00:00Z"))).toBe("2026-01-01");
   });
 
-  it("isCellDisabled covers not ready, future and pre-creation cells", () => {
+  it("isCellDisabled combines state and date rules", () => {
     const today = "2026-11-07";
     const created = "2026-03-10";
-    expect(isCellDisabled("2026-05-01", "2026-05-31", created, today, true)).toBe(false);
-    expect(isCellDisabled("2026-05-01", "2026-05-31", created, today, false)).toBe(true);
-    expect(isCellDisabled("2026-11-08", "2026-11-08", created, today, true)).toBe(true);
-    expect(isCellDisabled("2026-11-07", "2026-11-07", created, today, true)).toBe(false);
-    expect(isCellDisabled("2026-03-01", "2026-03-31", created, today, true)).toBe(false);
-    expect(isCellDisabled("2026-02-01", "2026-02-28", created, today, true)).toBe(true);
-    expect(isCellDisabled("2026-03-09", "2026-03-09", created, today, true)).toBe(true);
+    expect(isCellDisabled("2026-05-01", "2026-05-31", created, today, "exact")).toBe(false);
+    expect(isCellDisabled("2026-05-01", "2026-05-31", created, today, "approximate")).toBe(false);
+    expect(isCellDisabled("2026-05-01", "2026-05-31", created, today, "empty")).toBe(true);
+    expect(isCellDisabled("2026-05-01", "2026-05-31", created, today, undefined)).toBe(true);
+    expect(isCellDisabled("2026-11-08", "2026-11-08", created, today, "exact")).toBe(true);
+    expect(isCellDisabled("2026-11-07", "2026-11-07", created, today, "exact")).toBe(false);
+    expect(isCellDisabled("2026-03-01", "2026-03-31", created, today, "exact")).toBe(false);
+    expect(isCellDisabled("2026-02-01", "2026-02-28", created, today, "approximate")).toBe(true);
+    expect(isCellDisabled("2026-03-09", "2026-03-09", created, today, "exact")).toBe(true);
   });
 
   it("labelOfKey formats year, month and day", () => {

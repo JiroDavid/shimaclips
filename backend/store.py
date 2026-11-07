@@ -44,7 +44,6 @@ class Streamer:
 class Bucket:
     key: str
     count: int
-    ready: bool
     state: str
 
 
@@ -325,7 +324,7 @@ class Store:
         for key, b_start, b_end in spans:
             count = counts.get(key, 0)
             state = _cell_state(leaves, b_start, b_end, count)
-            out.append(Bucket(key, count, state == "exact", state))
+            out.append(Bucket(key, count, state))
         return out
 
     @staticmethod
