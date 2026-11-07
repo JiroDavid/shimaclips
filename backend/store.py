@@ -1,0 +1,285 @@
+import sqlite3
+from contextlib import closing
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+
+from twitch import Clip, User
+
+_FMT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def _enc(d: datetime) -> str:
+    return d.astimezone(timezone.utc).strftime(_FMT)
+
+
+def _dec(s: str) -> datetime:
+    return datetime.strptime(s, _FMT).replace(tzinfo=timezone.utc)
+
+
+def _day_start(d: date) -> str:
+    return f"{d.isoformat()}T00:00:00Z"
+
+
+@dataclass
+class Window:
+    start: datetime
+    end: datetime
+    status: str
+    fetched_at: datetime | None
+    truncated: bool
+
+
+@dataclass
+class Streamer:
+    broadcaster_id: str
+    login: str
+    display_name: str
+    account_created: datetime
+
+
+@dataclass
+class Bucket:
+    key: str
+    count: int
+    ready: bool
+
+
+@dataclass
+class Progress:
+    windows_done: int
+    windows_total: int
+    clips: int
+    capped: int
+
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS streamers (
+    broadcaster_id TEXT PRIMARY KEY,
+    login TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    account_created TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS clips (
+    id TEXT PRIMARY KEY,
+    broadcaster_id TEXT NOT NULL,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    thumbnail_url TEXT NOT NULL,
+    view_count INTEGER NOT NULL,
+    duration REAL NOT NULL,
+    creator_name TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS clips_by_created ON clips (broadcaster_id, created_at);
+CREATE INDEX IF NOT EXISTS clips_by_views ON clips (broadcaster_id, view_count);
+CREATE TABLE IF NOT EXISTS windows (
+    broadcaster_id TEXT NOT NULL,
+    start TEXT NOT NULL,
+    "end" TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    fetched_at TEXT,
+    truncated INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (broadcaster_id, start, "end")
+);
+"""
+
+
+class Store:
+    def __init__(self, path: Path):
+        self.path = Path(path)
+        with closing(self._connect()) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.executescript(_SCHEMA)
+            conn.commit()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.path, timeout=5.0)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=5000")
+        return conn
+
+    def _write(self, sql: str, rows: list[tuple]) -> None:
+        with closing(self._connect()) as conn:
+            with conn:
+                conn.executemany(sql, rows)
+
+    def upsert_streamer(self, user: User) -> None:
+        self._write(
+            "INSERT INTO streamers (broadcaster_id, login, display_name, account_created) "
+            "VALUES (?, ?, ?, ?) ON CONFLICT(broadcaster_id) DO UPDATE SET "
+            "login=excluded.login, display_name=excluded.display_name, "
+            "account_created=excluded.account_created",
+            [(user.id, user.login, user.display_name, _enc(user.created_at))],
+        )
+
+    def get_streamer(self, login: str) -> Streamer | None:
+        with closing(self._connect()) as conn:
+            r = conn.execute(
+                "SELECT * FROM streamers WHERE login = ? COLLATE NOCASE", (login,)
+            ).fetchone()
+        if r is None:
+            return None
+        return Streamer(r["broadcaster_id"], r["login"], r["display_name"], _dec(r["account_created"]))
+
+    def upsert_clips(self, broadcaster_id: str, clips: list[Clip]) -> None:
+        self._write(
+            "INSERT INTO clips (id, broadcaster_id, url, title, thumbnail_url, view_count, "
+            "duration, creator_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET url=excluded.url, title=excluded.title, "
+            "thumbnail_url=excluded.thumbnail_url, view_count=excluded.view_count, "
+            "duration=excluded.duration, creator_name=excluded.creator_name, "
+            "created_at=excluded.created_at",
+            [
+                (c.id, broadcaster_id, c.url, c.title, c.thumbnail_url, c.view_count,
+                 c.duration, c.creator_name, c.created_at)
+                for c in clips
+            ],
+        )
+
+    def add_windows(self, broadcaster_id: str, windows: list[tuple[datetime, datetime]]) -> None:
+        self._write(
+            'INSERT OR IGNORE INTO windows (broadcaster_id, start, "end") VALUES (?, ?, ?)',
+            [(broadcaster_id, _enc(s), _enc(e)) for s, e in windows],
+        )
+
+    @staticmethod
+    def _window(r: sqlite3.Row) -> Window:
+        return Window(
+            _dec(r["start"]),
+            _dec(r["end"]),
+            r["status"],
+            _dec(r["fetched_at"]) if r["fetched_at"] else None,
+            bool(r["truncated"]),
+        )
+
+    def next_pending(self, broadcaster_id: str) -> Window | None:
+        with closing(self._connect()) as conn:
+            r = conn.execute(
+                'SELECT * FROM windows WHERE broadcaster_id = ? AND status = \'pending\' '
+                'ORDER BY "end" DESC, start DESC LIMIT 1',
+                (broadcaster_id,),
+            ).fetchone()
+        return self._window(r) if r else None
+
+    def mark_done(self, broadcaster_id: str, start: datetime, end: datetime,
+                  fetched_at: datetime, truncated: bool) -> None:
+        self._write(
+            "UPDATE windows SET status='done', fetched_at=?, truncated=? "
+            'WHERE broadcaster_id=? AND start=? AND "end"=?',
+            [(_enc(fetched_at), int(truncated), broadcaster_id, _enc(start), _enc(end))],
+        )
+
+    def mark_split(self, broadcaster_id: str, start: datetime, end: datetime,
+                   children: list[tuple[datetime, datetime]]) -> None:
+        with closing(self._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE windows SET status='split' "
+                    'WHERE broadcaster_id=? AND start=? AND "end"=?',
+                    (broadcaster_id, _enc(start), _enc(end)),
+                )
+                conn.executemany(
+                    'INSERT OR IGNORE INTO windows (broadcaster_id, start, "end") VALUES (?, ?, ?)',
+                    [(broadcaster_id, _enc(s), _enc(e)) for s, e in children],
+                )
+
+    def reset_windows(self, broadcaster_id: str, mode: str, now: datetime,
+                      grace: timedelta) -> None:
+        with closing(self._connect()) as conn:
+            with conn:
+                rows = conn.execute(
+                    'SELECT start, "end", fetched_at FROM windows '
+                    "WHERE broadcaster_id = ? AND status = 'done'",
+                    (broadcaster_id,),
+                ).fetchall()
+                targets = []
+                for r in rows:
+                    if mode == "all":
+                        targets.append((broadcaster_id, r["start"], r["end"]))
+                    elif r["fetched_at"] is None or _dec(r["fetched_at"]) < _dec(r["end"]) + grace:
+                        targets.append((broadcaster_id, r["start"], r["end"]))
+                conn.executemany(
+                    "UPDATE windows SET status='pending', fetched_at=NULL, truncated=0 "
+                    'WHERE broadcaster_id=? AND start=? AND "end"=?',
+                    targets,
+                )
+
+    def bucket_counts(self, broadcaster_id: str, start: date, end: date,
+                      granularity: str) -> list[Bucket]:
+        spans = _bucket_spans(start, end, granularity)
+        length = 7 if granularity == "month" else 10
+        with closing(self._connect()) as conn:
+            counts = {
+                r["k"]: r["n"]
+                for r in conn.execute(
+                    f"SELECT substr(created_at, 1, {length}) AS k, COUNT(*) AS n FROM clips "
+                    "WHERE broadcaster_id = ? AND created_at >= ? AND created_at < ? GROUP BY k",
+                    (broadcaster_id, spans[0][1], spans[-1][2]),
+                )
+            } if spans else {}
+            leaves = conn.execute(
+                'SELECT start, "end", status FROM windows '
+                "WHERE broadcaster_id = ? AND status != 'split'",
+                (broadcaster_id,),
+            ).fetchall()
+        out = []
+        for key, b_start, b_end in spans:
+            overlapping = [w for w in leaves if w["start"] < b_end and w["end"] > b_start]
+            ready = bool(overlapping) and all(w["status"] == "done" for w in overlapping)
+            out.append(Bucket(key, counts.get(key, 0), ready))
+        return out
+
+    def top_clips(self, broadcaster_id: str, start: date | None, end: date | None,
+                  limit: int, offset: int) -> tuple[list[Clip], int]:
+        where = "broadcaster_id = ?"
+        args: list = [broadcaster_id]
+        if start is not None:
+            where += " AND created_at >= ?"
+            args.append(_day_start(start))
+        if end is not None:
+            where += " AND created_at < ?"
+            args.append(_day_start(end + timedelta(days=1)))
+        with closing(self._connect()) as conn:
+            total = conn.execute(f"SELECT COUNT(*) FROM clips WHERE {where}", args).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT * FROM clips WHERE {where} ORDER BY view_count DESC, id LIMIT ? OFFSET ?",
+                [*args, limit, offset],
+            ).fetchall()
+        clips = [
+            Clip(r["id"], r["url"], r["title"], r["thumbnail_url"], r["view_count"],
+                 r["duration"], r["creator_name"], r["created_at"])
+            for r in rows
+        ]
+        return clips, total
+
+    def progress(self, broadcaster_id: str) -> Progress:
+        with closing(self._connect()) as conn:
+            w = conn.execute(
+                "SELECT COUNT(*) AS total, "
+                "COALESCE(SUM(status = 'done'), 0) AS done, "
+                "COALESCE(SUM(status = 'done' AND truncated = 1), 0) AS capped "
+                "FROM windows WHERE broadcaster_id = ? AND status != 'split'",
+                (broadcaster_id,),
+            ).fetchone()
+            clips = conn.execute(
+                "SELECT COUNT(*) FROM clips WHERE broadcaster_id = ?", (broadcaster_id,)
+            ).fetchone()[0]
+        return Progress(w["done"], w["total"], clips, w["capped"])
+
+
+def _bucket_spans(start: date, end: date, granularity: str) -> list[tuple[str, str, str]]:
+    spans = []
+    if granularity == "month":
+        cur = date(start.year, start.month, 1)
+        while cur <= end:
+            nxt = date(cur.year + (cur.month == 12), cur.month % 12 + 1, 1)
+            spans.append((cur.strftime("%Y-%m"), _day_start(cur), _day_start(nxt)))
+            cur = nxt
+    else:
+        cur = start
+        while cur <= end:
+            nxt = cur + timedelta(days=1)
+            spans.append((cur.isoformat(), _day_start(cur), _day_start(nxt)))
+            cur = nxt
+    return spans
