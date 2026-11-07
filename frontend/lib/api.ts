@@ -76,6 +76,74 @@ export function watchJob(jobId: string, onUpdate: (s: JobState) => void): () => 
   return () => es.close();
 }
 
+export type Streamer = {
+  login: string;
+  display_name: string;
+  account_created: string;
+};
+
+export type LoadState = {
+  status: "queued" | "running" | "done" | "error";
+  error: string | null;
+  windows_done: number;
+  windows_total: number;
+  clips: number;
+  capped: boolean;
+  started_at: number;
+};
+
+export type Bucket = { key: string; count: number; ready: boolean };
+
+export async function loadStreamer(
+  login: string,
+  mode: "auto" | "full" = "auto",
+  signal?: AbortSignal,
+): Promise<{ streamer: Streamer; state: LoadState }> {
+  const r = await fetch(`${API}/api/streamers/${encodeURIComponent(login)}/load?mode=${mode}`, {
+    method: "POST",
+    signal,
+  });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return r.json();
+}
+
+export function watchStreamer(login: string, onUpdate: (s: LoadState) => void): () => void {
+  const es = new EventSource(`${API}/api/streamers/${encodeURIComponent(login)}/events`);
+  es.onmessage = (e) => {
+    const state: LoadState = JSON.parse(e.data);
+    onUpdate(state);
+    if (state.status === "done" || state.status === "error") es.close();
+  };
+  es.onerror = () => es.close();
+  return () => es.close();
+}
+
+export async function getCalendar(
+  login: string,
+  granularity: "month" | "day",
+  start: string,
+  end: string,
+  signal?: AbortSignal,
+): Promise<Bucket[]> {
+  const q = new URLSearchParams({ granularity, start, end });
+  const r = await fetch(`${API}/api/streamers/${encodeURIComponent(login)}/calendar?${q}`, { signal });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return (await r.json()).buckets;
+}
+
+export async function getClips(
+  login: string,
+  params: { start?: string; end?: string; limit: number; offset: number },
+  signal?: AbortSignal,
+): Promise<{ clips: Clip[]; total: number }> {
+  const q = new URLSearchParams({ limit: String(params.limit), offset: String(params.offset) });
+  if (params.start) q.set("start", params.start);
+  if (params.end) q.set("end", params.end);
+  const r = await fetch(`${API}/api/streamers/${encodeURIComponent(login)}/clips?${q}`, { signal });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return r.json();
+}
+
 export function fileUrl(jobId: string): string {
   return `${API}/api/downloads/${jobId}/file`;
 }
