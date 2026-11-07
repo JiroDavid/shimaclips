@@ -49,17 +49,19 @@ app.add_middleware(
 
 job_store = JobStore()
 _twitch: TwitchClient | None = None
+_twitch_lock = threading.Lock()
 
 
 def get_twitch() -> TwitchClient:
     global _twitch
-    if _twitch is None:
-        client_id = os.environ.get("TWITCH_CLIENT_ID")
-        secret = os.environ.get("TWITCH_CLIENT_SECRET")
-        if not client_id or not secret:
-            raise HTTPException(500, "Set TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET in backend/.env")
-        _twitch = TwitchClient(client_id, secret)
-    return _twitch
+    with _twitch_lock:
+        if _twitch is None:
+            client_id = os.environ.get("TWITCH_CLIENT_ID")
+            secret = os.environ.get("TWITCH_CLIENT_SECRET")
+            if not client_id or not secret:
+                raise HTTPException(500, "Set TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET in backend/.env")
+            _twitch = TwitchClient(client_id, secret)
+        return _twitch
 
 
 _store: Store | None = None

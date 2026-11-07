@@ -7,9 +7,13 @@ from typing import Callable
 from fetcher import plan_windows, run_fetch
 from loader import LoadManager
 from store import Store, WatchEntry
-from twitch import TwitchClient, User
+from twitch import TwitchClient, TwitchError, User
 
 log = logging.getLogger(__name__)
+
+
+class _SetupFailed(Exception):
+    pass
 
 
 class WatchCrawler:
@@ -31,6 +35,7 @@ class WatchCrawler:
         self._lock = threading.Lock()
         self._working: str | None = None
         self._errors: dict[str, float] = {}
+        self._setup_failed_at: float | None = None
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
@@ -57,6 +62,41 @@ class WatchCrawler:
     def _should_stop(self) -> bool:
         return self._stopped.is_set() or self.manager.interactive_active()
 
+    def _twitch(self) -> TwitchClient:
+        try:
+            twitch = self.twitch_factory()
+        except Exception as e:
+            self._setup_failed_at = self.monotonic()
+            log.warning("Watchlist crawler cannot reach Twitch: %s", str(e) or type(e).__name__)
+            raise _SetupFailed() from e
+        self._setup_failed_at = None
+        return twitch
+
+    def _eligible(self, entry: WatchEntry) -> bool:
+        return not entry.paused and not self._backing_off(entry.login)
+
+    def _needs_coarse(self, entry: WatchEntry) -> bool:
+        if entry.broadcaster_id is None:
+            return True
+        if self._user(entry) is None:
+            return False
+        bid = entry.broadcaster_id
+        return (self.store.progress(bid).windows_total == 0
+                or self.store.next_pending(bid, None, coarse_only=True) is not None)
+
+    def _run_should_stop(self, login: str, coarse_only: bool) -> Callable[[], bool]:
+        def should_stop() -> bool:
+            if self._should_stop():
+                return True
+            entries = self.store.watch_list()
+            mine = next((e for e in entries if e.login == login), None)
+            if mine is None or mine.paused:
+                return True
+            if coarse_only:
+                return False
+            return any(e.login != login and self._eligible(e) and self._needs_coarse(e) for e in entries)
+        return should_stop
+
     def _allowed(self, bid: str) -> set[int]:
         return self.store.exact_years(bid, self.now().year)
 
@@ -78,8 +118,13 @@ class WatchCrawler:
                 continue
             if self._should_stop():
                 return
+            twitch = self._twitch()
             try:
-                user = self.twitch_factory().get_user(e.login)
+                user = twitch.get_user(e.login)
+            except TwitchError as err:
+                log.warning("Could not look up watchlist streamer '%s': %s", e.login, err)
+                self._record_error(e.login)
+                continue
             except Exception:
                 log.warning("Could not look up watchlist streamer '%s'", e.login, exc_info=True)
                 self._record_error(e.login)
@@ -100,13 +145,18 @@ class WatchCrawler:
         return User(s.broadcaster_id, s.login, s.display_name, s.account_created)
 
     def _run(self, login: str, bid: str, coarse_only: bool) -> bool:
+        twitch = self._twitch()
         with self._lock:
             self._working = login
         try:
-            run_fetch(self.store, self.twitch_factory(), bid, now=self.now,
-                      should_stop=self._should_stop,
+            run_fetch(self.store, twitch, bid, now=self.now,
+                      should_stop=self._run_should_stop(login, coarse_only),
                       allowed_years=lambda: self._allowed(bid),
                       coarse_only=coarse_only, delay=self.window_delay)
+        except TwitchError as err:
+            log.warning("Background load of '%s' failed: %s", login, err)
+            self._record_error(login)
+            return False
         except Exception:
             log.warning("Background load of '%s' failed", login, exc_info=True)
             self._record_error(login)
@@ -121,12 +171,21 @@ class WatchCrawler:
     def _refine(self, login: str, bid: str) -> None:
         if not self._run(login, bid, coarse_only=False):
             return
-        if not self._should_stop() and self.store.next_pending(bid, self._allowed(bid)) is None:
+        if not self._stopped.is_set() and self.store.next_pending(bid, self._allowed(bid)) is None:
             self.store.watch_mark_refreshed(login, self.now())
 
     def tick(self) -> None:
         if self._should_stop():
             return
+        failed = self._setup_failed_at
+        if failed is not None and self.monotonic() - failed < self.retry_after:
+            return
+        try:
+            self._tick()
+        except _SetupFailed:
+            return
+
+    def _tick(self) -> None:
         entries = self.store.watch_list()
         with self._lock:
             known = {e.login for e in entries}

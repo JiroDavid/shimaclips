@@ -313,3 +313,104 @@ def test_status_for_unresolved_entry_is_waiting_with_zero_progress(env):
     _, store, _, _, crawler = env
     store.watch_add("alpha", None)
     assert crawler.status("alpha") == {"state": "waiting", "windows_done": 0, "windows_total": 0}
+
+
+def test_pausing_mid_run_stops_after_current_window_and_resume_continues(env):
+    twitch, store, _, _, crawler = env
+    watch(store, twitch, "alpha")
+    twitch.on_fetch = lambda *_: store.watch_set_paused("alpha", True)
+    crawler.tick()
+    assert len(twitch.calls) == 1
+    assert store.next_pending("1", coarse_only=True) is not None
+    twitch.on_fetch = None
+    crawler.tick()
+    assert len(twitch.calls) == 1
+    store.watch_set_paused("alpha", False)
+    run_until_idle(crawler, twitch)
+    assert len(twitch.calls) == 3
+    assert entry(store, "alpha").last_refreshed == NOW
+
+
+def test_removing_mid_run_stops_after_current_window(env):
+    twitch, store, _, _, crawler = env
+    watch(store, twitch, "alpha")
+    twitch.on_fetch = lambda *_: store.watch_remove("alpha")
+    crawler.tick()
+    assert len(twitch.calls) == 1
+    assert store.next_pending("1", coarse_only=True) is not None
+    crawler.tick()
+    assert len(twitch.calls) == 1
+
+
+@pytest.mark.parametrize("resolved", [False, True])
+def test_entry_added_mid_refine_gets_coarse_pass_first(env, resolved):
+    twitch, store, _, _, crawler = env
+    twitch.truncate_months = True
+    watch(store, twitch, "alpha")
+    crawler.tick()
+    assert len(twitch.calls) == 3
+    refine_calls = []
+
+    def add_beta(bid, start, end):
+        refine_calls.append(bid)
+        if len(refine_calls) == 2:
+            if resolved:
+                watch(store, twitch, "beta")
+            else:
+                store.watch_add("beta", None)
+
+    twitch.on_fetch = add_beta
+    crawler.tick()
+    assert len(twitch.calls) == 5
+    assert store.next_pending("1", store.exact_years("1", NOW.year)) is not None
+    assert entry(store, "alpha").last_refreshed is None
+    twitch.on_fetch = None
+    crawler.tick()
+    beta_calls = twitch.calls[5:]
+    assert len(beta_calls) == 3
+    assert all(b == "2" and is_month(s, e) for b, s, e in beta_calls)
+    crawler.tick()
+    assert len(twitch.calls) > 8
+    assert {c[0] for c in twitch.calls[8:]} == {"1"}
+    assert entry(store, "alpha").last_refreshed == NOW
+
+
+def test_refresh_marked_when_interactive_job_starts_right_after_last_window(env):
+    twitch, store, mgr, _, crawler = env
+    twitch.truncate_months = True
+    watch(store, twitch, "alpha")
+    crawler.tick()
+
+    def start_interactive_on_last(bid, start, end):
+        if start == CREATED and not is_month(start, end):
+            mgr.active = True
+
+    twitch.on_fetch = start_interactive_on_last
+    crawler.tick()
+    assert mgr.active
+    assert store.next_pending("1", store.exact_years("1", NOW.year)) is None
+    assert entry(store, "alpha").last_refreshed == NOW
+
+
+def test_missing_credentials_log_one_line_per_tick(env, caplog):
+    twitch, store, _, clock, crawler = env
+    watch(store, twitch, "alpha", "beta")
+    store.watch_add("gamma", None)
+    store.watch_add("delta", None)
+
+    def no_creds():
+        raise RuntimeError("Set TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET in backend/.env")
+
+    crawler.twitch_factory = no_creds
+    for _ in range(3):
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            crawler.tick()
+        lines = [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len(lines) <= 1
+        assert all(r.exc_info is None and "TWITCH_CLIENT_ID" in r.getMessage() for r in lines)
+        clock.mono += 61
+    crawler.twitch_factory = lambda: twitch
+    for _ in range(6):
+        crawler.tick()
+    assert {e.login for e in store.watch_list() if e.last_refreshed == NOW} == {"alpha", "beta", "gamma"}

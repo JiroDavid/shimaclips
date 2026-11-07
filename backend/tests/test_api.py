@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -542,3 +543,34 @@ def test_lifespan_starts_and_stops_crawler_before_manager(monkeypatch):
     with TestClient(main.app):
         assert crawler.started == 1
     assert order == ["crawler", "manager"]
+
+
+def test_get_twitch_concurrent_first_calls_share_one_client(monkeypatch):
+    made = []
+
+    class SlowClient:
+        def __init__(self, client_id, secret):
+            time.sleep(0.05)
+            made.append(self)
+
+    monkeypatch.setenv("TWITCH_CLIENT_ID", "id")
+    monkeypatch.setenv("TWITCH_CLIENT_SECRET", "secret")
+    monkeypatch.setattr(main, "_twitch", None)
+    monkeypatch.setattr(main, "TwitchClient", SlowClient)
+    results = []
+    threads = [threading.Thread(target=lambda: results.append(main.get_twitch())) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(5)
+    assert len(made) == 1
+    assert len(results) == 4 and all(r is made[0] for r in results)
+
+
+def test_get_twitch_missing_credentials_still_raises(monkeypatch):
+    monkeypatch.delenv("TWITCH_CLIENT_ID", raising=False)
+    monkeypatch.delenv("TWITCH_CLIENT_SECRET", raising=False)
+    monkeypatch.setattr(main, "_twitch", None)
+    with pytest.raises(main.HTTPException) as e:
+        main.get_twitch()
+    assert e.value.status_code == 500
