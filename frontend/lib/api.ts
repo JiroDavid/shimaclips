@@ -140,14 +140,39 @@ export async function getCalendar(
   return (await r.json()).buckets;
 }
 
+export type YearInfo = {
+  year: number;
+  enabled: boolean;
+  state: "exact" | "approximate" | "empty";
+  clips: number;
+};
+
+export async function getYears(login: string, signal?: AbortSignal): Promise<YearInfo[]> {
+  const r = await fetch(`${API}/api/streamers/${encodeURIComponent(login)}/years`, { signal });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return (await r.json()).years;
+}
+
+export async function setYearExact(login: string, year: number, enabled: boolean): Promise<void> {
+  const r = await fetch(`${API}/api/streamers/${encodeURIComponent(login)}/years/${year}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!r.ok) throw new Error(await errorMessage(r));
+}
+
+export type ClipsPage = { clips: Clip[]; total: number; exact: boolean; has_more: boolean };
+
 export async function getClips(
   login: string,
-  params: { start?: string; end?: string; limit: number; offset: number },
+  params: { start?: string; end?: string; limit: number; offset: number; sort?: "views" | "newest" },
   signal?: AbortSignal,
-): Promise<{ clips: Clip[]; total: number }> {
+): Promise<ClipsPage> {
   const q = new URLSearchParams({ limit: String(params.limit), offset: String(params.offset) });
   if (params.start) q.set("start", params.start);
   if (params.end) q.set("end", params.end);
+  if (params.sort) q.set("sort", params.sort);
   const r = await fetch(`${API}/api/streamers/${encodeURIComponent(login)}/clips?${q}`, { signal });
   if (!r.ok) throw new Error(await errorMessage(r));
   return r.json();

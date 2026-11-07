@@ -20,14 +20,18 @@ describe("nextPage", () => {
 
   it("splits a large limit into pages of at most 100", () => {
     expect(nextPage(0, 250, null)).toEqual({ offset: 0, limit: 100 });
-    expect(nextPage(100, 250, 1000)).toEqual({ offset: 100, limit: 100 });
-    expect(nextPage(200, 250, 1000)).toEqual({ offset: 200, limit: 50 });
-    expect(nextPage(250, 250, 1000)).toBeNull();
+    expect(nextPage(100, 250, true)).toEqual({ offset: 100, limit: 100 });
+    expect(nextPage(200, 250, true)).toEqual({ offset: 200, limit: 50 });
+    expect(nextPage(250, 250, true)).toBeNull();
   });
 
-  it("stops at the total", () => {
-    expect(nextPage(100, 250, 100)).toBeNull();
-    expect(nextPage(100, 250, 130)).toEqual({ offset: 100, limit: 100 });
+  it("stops when the server says there is no more", () => {
+    expect(nextPage(100, 250, false)).toBeNull();
+    expect(nextPage(0, 10, false)).toBeNull();
+  });
+
+  it("keeps going while the server has more, even if the total grew", () => {
+    expect(nextPage(100, 250, true)).toEqual({ offset: 100, limit: 100 });
   });
 });
 

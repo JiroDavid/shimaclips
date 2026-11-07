@@ -5,6 +5,7 @@ import CalendarView from "@/components/CalendarView";
 import DownloadPanel from "@/components/DownloadPanel";
 import LoadingBanner from "@/components/LoadingBanner";
 import ReelSection from "@/components/ReelSection";
+import YearChips from "@/components/YearChips";
 import SelectionPanel from "@/components/SelectionPanel";
 import StreamerSearch from "@/components/StreamerSearch";
 import { labelOfKey, rangeOfKey, todayUtc } from "@/lib/calendar";
@@ -12,6 +13,7 @@ import { emptySelection, isNewStreamer, removeClip, toggleClip, type Selection }
 import type { Clip } from "@/lib/api";
 import { useDownload } from "@/lib/useDownload";
 import { useStreamer } from "@/lib/useStreamer";
+import { useYears } from "@/lib/useYears";
 
 export default function Home() {
   const { streamer, state, phase, error, tick, startedAt, open, refresh } = useStreamer();
@@ -31,6 +33,13 @@ export default function Home() {
   }
 
   const download = useDownload(owner);
+  const yearsState = useYears(shownLogin, tick);
+  const yearOptions = yearsState.years.map((y) => y.year);
+
+  function onYearToggle(year: number, enabled: boolean) {
+    yearsState.toggle(year, enabled);
+    // Task 11 re-attaches the load-progress stream here
+  }
 
   const busy = phase === "opening" || phase === "loading";
 
@@ -39,7 +48,7 @@ export default function Home() {
     return [
       { key: "month", title: "Top clips this month", range: rangeOfKey(today.slice(0, 7)) },
       { key: "year", title: "Top clips this year", range: rangeOfKey(today.slice(0, 4)) },
-      { key: "all", title: "Most viewed of all time", range: {} },
+      { key: "all", title: "Most viewed of all time", range: {}, withYears: true },
     ];
   }
 
@@ -107,6 +116,13 @@ export default function Home() {
 
       {streamer && (
         <>
+          <YearChips
+            key={streamer.login}
+            years={yearsState.years}
+            pending={yearsState.pending}
+            error={yearsState.error}
+            onToggle={onYearToggle}
+          />
           <CalendarView
             key={streamer.login}
             login={streamer.login}
@@ -142,6 +158,7 @@ export default function Home() {
               selection={clipSelection}
               onToggle={toggle}
               loadingNote={phase === "loading"}
+              yearOptions={r.withYears ? yearOptions : undefined}
             />
           ))}
           {(download.error || download.job || clipSelection.size > 0) && (

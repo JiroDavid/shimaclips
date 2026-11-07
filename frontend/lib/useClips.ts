@@ -8,50 +8,65 @@ import { appendUnique, nextPage } from "@/lib/paging";
 const PAGE = 10;
 const NONE: Clip[] = [];
 
-type Settled = { id: string; clips: Clip[]; total: number; error: string | null };
+type Sort = "views" | "newest";
+type Settled = { id: string; clips: Clip[]; total: number; exact: boolean; hasMore: boolean; error: string | null };
 
 async function fetchTop(
   login: string,
   start: string | undefined,
   end: string | undefined,
   limit: number,
+  sort: Sort,
   signal: AbortSignal,
-): Promise<{ clips: Clip[]; total: number }> {
+): Promise<{ clips: Clip[]; total: number; exact: boolean; hasMore: boolean }> {
   let clips: Clip[] = [];
   let fetched = 0;
-  let total: number | null = null;
-  for (let page = nextPage(0, limit, null); page; page = nextPage(fetched, limit, total)) {
+  let total = 0;
+  let exact = false;
+  let hasMore: boolean | null = null;
+  for (let page = nextPage(0, limit, null); page; page = nextPage(fetched, limit, hasMore)) {
     if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-    const res = await getClips(login, { start, end, ...page }, signal);
+    const res = await getClips(login, { start, end, sort, ...page }, signal);
     total = res.total;
+    exact = res.exact;
+    hasMore = res.has_more && res.clips.length > 0;
     fetched += res.clips.length;
     clips = appendUnique(clips, res.clips);
     if (res.clips.length === 0) break;
   }
-  return { clips, total: total ?? 0 };
+  return { clips, total, exact, hasMore: hasMore === true };
 }
 
 export function useClips(
   login: string | null,
   range: { start?: string; end?: string } | null,
   tick: number,
-): { clips: Clip[]; total: number; loading: boolean; error: string | null; showMore(): void; hasMore: boolean } {
+  sort: Sort = "views",
+): {
+  clips: Clip[];
+  total: number;
+  exact: boolean;
+  loading: boolean;
+  error: string | null;
+  showMore(): void;
+  hasMore: boolean;
+} {
   const [limit, setLimit] = useState(PAGE);
-  const [settled, setSettled] = useState<Settled>({ id: "", clips: NONE, total: 0, error: null });
+  const [settled, setSettled] = useState<Settled>({ id: "", clips: NONE, total: 0, exact: false, hasMore: false, error: null });
   const latest = useRef(createLatest());
   const start = range?.start;
   const end = range?.end;
   const enabled = !!login && range !== null;
-  const id = `${enabled}|${login}|${start ?? ""}|${end ?? ""}|${limit}|${tick}`;
+  const id = `${enabled}|${login}|${start ?? ""}|${end ?? ""}|${sort}|${limit}|${tick}`;
 
   useEffect(() => {
     if (!enabled || !login) return;
     let cancelled = false;
     latest.current
-      .run((signal) => fetchTop(login, start, end, limit, signal))
+      .run((signal) => fetchTop(login, start, end, limit, sort, signal))
       .then((res) => {
         if (cancelled || !res.ok) return;
-        setSettled({ id, clips: res.value.clips, total: res.value.total, error: null });
+        setSettled({ id, clips: res.value.clips, total: res.value.total, exact: res.value.exact, hasMore: res.value.hasMore, error: null });
       })
       .catch((e) => {
         if (cancelled) return;
@@ -61,15 +76,16 @@ export function useClips(
     return () => {
       cancelled = true;
     };
-  }, [enabled, login, start, end, limit, tick, id]);
+  }, [enabled, login, start, end, sort, limit, tick, id]);
 
-  if (!enabled) return { clips: NONE, total: 0, loading: false, error: null, showMore() {}, hasMore: false };
+  if (!enabled) return { clips: NONE, total: 0, exact: false, loading: false, error: null, showMore() {}, hasMore: false };
   return {
     clips: settled.clips,
     total: settled.total,
+    exact: settled.exact,
     loading: settled.id !== id,
     error: settled.error,
     showMore: () => setLimit((l) => l + PAGE),
-    hasMore: settled.clips.length < settled.total,
+    hasMore: settled.hasMore,
   };
 }

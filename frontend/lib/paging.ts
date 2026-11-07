@@ -5,10 +5,9 @@ export const MAX_PAGE = 100;
 export function nextPage(
   fetched: number,
   limit: number,
-  total: number | null,
+  hasMore: boolean | null,
 ): { offset: number; limit: number } | null {
-  const want = Math.min(limit, total ?? limit);
-  if (fetched >= want) return null;
+  if (hasMore === false || fetched >= limit) return null;
   return { offset: fetched, limit: Math.min(MAX_PAGE, limit - fetched) };
 }
 
