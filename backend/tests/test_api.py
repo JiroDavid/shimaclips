@@ -241,3 +241,23 @@ def test_download_accepts_twitch_urls(api, monkeypatch, url):
     monkeypatch.setattr(main, "start_job", lambda job, clips: None)
     r = api(FakeTwitch()).post("/api/downloads", json={"clips": [{"url": url, "title": "t", "view_count": 1}]})
     assert r.status_code == 200
+
+
+def test_app_shutdown_stops_the_load_manager(monkeypatch):
+    calls = []
+
+    class Manager:
+        def shutdown(self):
+            calls.append("shutdown")
+
+    monkeypatch.setattr(main, "_manager", Manager())
+    with TestClient(main.app):
+        assert calls == []
+    assert calls == ["shutdown"]
+
+
+def test_load_after_shutdown_returns_503(api):
+    c = api()
+    c.mgr.shutdown()
+    r = c.post("/api/streamers/jason/load")
+    assert r.status_code == 503

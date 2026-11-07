@@ -7,6 +7,7 @@ from pathlib import Path
 from twitch import Clip, User
 
 _FMT = "%Y-%m-%dT%H:%M:%SZ"
+SCHEMA_VERSION = 2
 
 
 def _enc(d: datetime) -> str:
@@ -80,6 +81,7 @@ CREATE TABLE IF NOT EXISTS windows (
     status TEXT NOT NULL DEFAULT 'pending',
     fetched_at TEXT,
     truncated INTEGER NOT NULL DEFAULT 0,
+    has_data INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (broadcaster_id, start, "end")
 );
 """
@@ -90,8 +92,27 @@ class Store:
         self.path = Path(path)
         with closing(self._connect()) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
+            existing = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='windows'"
+            ).fetchone() is not None
             conn.executescript(_SCHEMA)
-            conn.commit()
+            with conn:
+                version = conn.execute("PRAGMA user_version").fetchone()[0]
+                if version < SCHEMA_VERSION:
+                    if existing:
+                        self._migrate(conn)
+                    conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+
+    @staticmethod
+    def _migrate(conn: sqlite3.Connection) -> None:
+        columns = {r["name"] for r in conn.execute("PRAGMA table_info(windows)")}
+        if "has_data" not in columns:
+            conn.execute("ALTER TABLE windows ADD COLUMN has_data INTEGER NOT NULL DEFAULT 0")
+        # Windows fetched before the 800-clip threshold may be silently truncated, so refetch them all.
+        conn.execute(
+            "UPDATE windows SET status='pending', fetched_at=NULL, truncated=0, has_data=0 "
+            "WHERE status='done'"
+        )
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path, timeout=5.0)
@@ -165,7 +186,7 @@ class Store:
     def mark_done(self, broadcaster_id: str, start: datetime, end: datetime,
                   fetched_at: datetime, truncated: bool) -> None:
         self._write(
-            "UPDATE windows SET status='done', fetched_at=?, truncated=? "
+            "UPDATE windows SET status='done', fetched_at=?, truncated=?, has_data=1 "
             'WHERE broadcaster_id=? AND start=? AND "end"=?',
             [(_enc(fetched_at), int(truncated), broadcaster_id, _enc(start), _enc(end))],
         )
@@ -183,6 +204,15 @@ class Store:
                     'INSERT OR IGNORE INTO windows (broadcaster_id, start, "end") VALUES (?, ?, ?)',
                     [(broadcaster_id, _enc(s), _enc(e)) for s, e in children],
                 )
+
+    def split_windows(self, broadcaster_id: str) -> list[tuple[datetime, datetime]]:
+        with closing(self._connect()) as conn:
+            rows = conn.execute(
+                'SELECT start, "end" FROM windows WHERE broadcaster_id = ? AND status = \'split\' '
+                "ORDER BY start",
+                (broadcaster_id,),
+            ).fetchall()
+        return [(_dec(r["start"]), _dec(r["end"])) for r in rows]
 
     def reset_windows(self, broadcaster_id: str, mode: str, now: datetime,
                       grace: timedelta) -> None:
@@ -219,14 +249,14 @@ class Store:
                 )
             } if spans else {}
             leaves = conn.execute(
-                'SELECT start, "end", status FROM windows '
+                'SELECT start, "end", has_data FROM windows '
                 "WHERE broadcaster_id = ? AND status != 'split'",
                 (broadcaster_id,),
             ).fetchall()
         out = []
         for key, b_start, b_end in spans:
             overlapping = [w for w in leaves if w["start"] < b_end and w["end"] > b_start]
-            ready = bool(overlapping) and all(w["status"] == "done" for w in overlapping)
+            ready = bool(overlapping) and all(w["has_data"] for w in overlapping)
             out.append(Bucket(key, counts.get(key, 0), ready))
         return out
 

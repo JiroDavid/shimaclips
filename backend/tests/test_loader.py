@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from loader import LoadManager, StreamerNotFound, normalize_login, state_to_dict
+from loader import LoadManager, LoaderUnavailable, StreamerNotFound, normalize_login, state_to_dict
 from store import Store
 from twitch import ClipsResult, TwitchError, User
 
@@ -61,7 +61,7 @@ def env(tmp_path):
     yield twitch, store, mgr
     for g in twitch.gates.values():
         g.set()
-    mgr.shutdown()
+    mgr.shutdown(wait=True)
 
 
 def test_normalize_login_cases():
@@ -149,3 +149,52 @@ def test_state_to_dict_has_all_fields(env):
     mgr.ensure("alpha")
     d = state_to_dict(mgr.state("alpha"))
     assert set(d) == {"status", "error", "windows_done", "windows_total", "clips", "capped", "started_at"}
+
+
+def test_shutdown_stops_running_job_between_windows(env):
+    twitch, _, mgr = env
+    twitch.hold("alpha")
+    mgr.ensure("alpha")
+    assert twitch.entered["1"].wait(5)
+    t0 = time.monotonic()
+    mgr.shutdown()
+    assert time.monotonic() - t0 < 1
+    twitch.release("alpha")
+    assert wait_for(lambda: mgr.state("alpha").status == "error")
+    assert twitch.calls["1"] == 1
+
+
+def test_ensure_after_shutdown_raises_and_leaves_no_queued_job(env):
+    _, _, mgr = env
+    mgr.shutdown(wait=True)
+    with pytest.raises(LoaderUnavailable):
+        mgr.ensure("alpha")
+    assert mgr.state("alpha") is None
+
+
+def test_submit_failure_does_not_register_queued_job(env, monkeypatch):
+    _, _, mgr = env
+
+    def boom(*a, **k):
+        raise RuntimeError("cannot schedule new futures after shutdown")
+
+    monkeypatch.setattr(mgr._pool, "submit", boom)
+    with pytest.raises(LoaderUnavailable):
+        mgr.ensure("alpha")
+    assert mgr.state("alpha") is None
+
+
+def test_shutdown_marks_queued_jobs_stopped(env):
+    twitch, _, mgr = env
+    for n in ("alpha", "beta", "gamma"):
+        twitch.hold(n)
+    mgr.ensure("alpha")
+    mgr.ensure("beta")
+    assert twitch.entered["1"].wait(5) and twitch.entered["2"].wait(5)
+    mgr.ensure("gamma")
+    mgr.shutdown()
+    assert mgr.state("gamma").status == "error"
+    twitch.release("alpha")
+    twitch.release("beta")
+    assert wait_for(lambda: mgr.state("alpha").status == "error" and mgr.state("beta").status == "error")
+    assert "3" not in twitch.calls

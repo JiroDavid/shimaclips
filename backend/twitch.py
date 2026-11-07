@@ -8,6 +8,13 @@ import httpx
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 API_URL = "https://api.twitch.tv/helix"
 MAX_CLIPS = 3000
+# Helix ends pagination after about 11 pages per query even when more clips exist, and its
+# pages are often short, so reaching this many pages is the reliable sign of a cut-off result.
+HELIX_PAGE_LIMIT = 10
+MAX_ATTEMPTS = 6
+MAX_SLEEP = 60.0
+DEFAULT_BACKOFF = 1.0
+PACE_FLOOR = 5
 
 
 class TwitchError(Exception):
@@ -44,11 +51,29 @@ def _rfc3339(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _retry_after(r: httpx.Response) -> float:
+def _now() -> float:
+    return time.time()
+
+
+def _header(r: httpx.Response, name: str) -> float | None:
     try:
-        return max(float(r.headers.get("Retry-After", 1)), 0)
-    except ValueError:
-        return 1
+        return float(r.headers[name])
+    except (KeyError, ValueError):
+        return None
+
+
+def _capped(seconds: float) -> float:
+    return min(max(seconds, 0.0), MAX_SLEEP)
+
+
+def _rate_limit_wait(r: httpx.Response) -> float:
+    retry_after = _header(r, "Retry-After")
+    if retry_after is not None:
+        return _capped(retry_after)
+    reset = _header(r, "Ratelimit-Reset")
+    if reset is not None:
+        return _capped(reset - _now())
+    return DEFAULT_BACKOFF
 
 
 class TwitchClient:
@@ -59,6 +84,9 @@ class TwitchClient:
         self._token: str | None = None
         self._expires = 0.0
         self._token_lock = threading.Lock()
+        self._limit_lock = threading.Lock()
+        self._remaining: float | None = None
+        self._reset: float | None = None
 
     def _fetch_token(self, stale: str | None = None) -> None:
         with self._token_lock:
@@ -78,11 +106,26 @@ class TwitchClient:
         self._token = data["access_token"]
         self._expires = time.time() + data["expires_in"] - 60
 
+    def _pace(self) -> None:
+        with self._limit_lock:
+            if self._remaining is not None and self._remaining < PACE_FLOOR and self._reset is not None:
+                time.sleep(_capped(self._reset - _now()))
+            self._remaining = None
+
+    def _note_limits(self, r: httpx.Response) -> None:
+        remaining = _header(r, "Ratelimit-Remaining")
+        reset = _header(r, "Ratelimit-Reset")
+        with self._limit_lock:
+            self._remaining = remaining
+            self._reset = reset
+
     def _get(self, path: str, params: dict) -> dict:
         if not self._token or time.time() >= self._expires:
             self._fetch_token()
         refreshed = False
-        for attempt in range(3):
+        attempts = 0
+        while True:
+            self._pace()
             token = self._token
             r = self._http.get(f"{API_URL}{path}", params=params, headers={
                 "Client-Id": self._client_id,
@@ -92,9 +135,13 @@ class TwitchClient:
                 refreshed = True
                 self._fetch_token(stale=token)
                 continue
-            if r.status_code == 429 and attempt < 2:
-                time.sleep(_retry_after(r))
-                continue
+            if r.status_code == 429:
+                attempts += 1
+                if attempts < MAX_ATTEMPTS:
+                    time.sleep(_rate_limit_wait(r))
+                    continue
+            else:
+                self._note_limits(r)
             break
         if r.status_code != 200:
             raise TwitchError(f"Twitch API error ({r.status_code})")
@@ -110,12 +157,14 @@ class TwitchClient:
         return User(id=u["id"], login=u["login"], display_name=u["display_name"], created_at=created)
 
     def fetch_window(self, broadcaster_id: str, start: datetime, end: datetime) -> ClipsResult:
-        clips = self._collect_clips(broadcaster_id, start, end)[:MAX_CLIPS]
-        return ClipsResult(clips=clips, truncated=len(clips) >= MAX_CLIPS)
+        clips, pages = self._collect_clips(broadcaster_id, start, end)
+        truncated = len(clips) >= MAX_CLIPS or pages >= HELIX_PAGE_LIMIT
+        return ClipsResult(clips=clips[:MAX_CLIPS], truncated=truncated)
 
-    def _collect_clips(self, broadcaster_id: str, start: datetime, end: datetime) -> list[Clip]:
+    def _collect_clips(self, broadcaster_id: str, start: datetime, end: datetime) -> tuple[list[Clip], int]:
         clips: list[Clip] = []
         cursor = None
+        pages = 0
         while len(clips) < MAX_CLIPS:
             params = {
                 "broadcaster_id": broadcaster_id,
@@ -126,6 +175,7 @@ class TwitchClient:
             if cursor:
                 params["after"] = cursor
             body = self._get("/clips", params)
+            pages += 1
             clips += [
                 Clip(
                     id=c["id"], url=c["url"], title=c["title"], thumbnail_url=c["thumbnail_url"],
@@ -137,4 +187,4 @@ class TwitchClient:
             cursor = body.get("pagination", {}).get("cursor")
             if not cursor:
                 break
-        return clips
+        return clips, pages

@@ -27,6 +27,13 @@ class StreamerNotFound(Exception):
     pass
 
 
+class LoaderUnavailable(Exception):
+    pass
+
+
+STOPPED = "Loading stopped because the server is shutting down"
+
+
 @dataclass
 class LoadState:
     status: str
@@ -57,9 +64,12 @@ class LoadManager:
         self._pool = ThreadPoolExecutor(max_workers=max_concurrent)
         self._lock = threading.Lock()
         self._jobs: dict[str, _Job] = {}
+        self._stop = threading.Event()
 
     def ensure(self, login: str, mode: str = "auto") -> tuple[Streamer, LoadState]:
         login = normalize_login(login)
+        if self._stop.is_set():
+            raise LoaderUnavailable()
         twitch = self.twitch_factory()
         user = twitch.get_user(login)
         if user is None:
@@ -71,8 +81,11 @@ class LoadManager:
             if job is None or job.status not in ("queued", "running"):
                 plan_windows(self.store, user, mode, datetime.now(timezone.utc))
                 job = _Job("queued", None, time.time())
+                try:
+                    self._pool.submit(self._run, job, twitch, user.id)
+                except RuntimeError:
+                    raise LoaderUnavailable()
                 self._jobs[user.id] = job
-                self._pool.submit(self._run, job, twitch, user.id)
         return streamer, self._snapshot(user.id, job)
 
     def state(self, login: str) -> LoadState | None:
@@ -89,8 +102,13 @@ class LoadManager:
             return None
         return self._snapshot(streamer.broadcaster_id, job)
 
-    def shutdown(self) -> None:
-        self._pool.shutdown(wait=True)
+    def shutdown(self, wait: bool = False) -> None:
+        self._stop.set()
+        self._pool.shutdown(wait=wait, cancel_futures=True)
+        with self._lock:
+            for job in self._jobs.values():
+                if job.status == "queued":
+                    job.status, job.error = "error", STOPPED
 
     def _snapshot(self, broadcaster_id: str, job: _Job) -> LoadState:
         with self._lock:
@@ -106,10 +124,13 @@ class LoadManager:
     def _run(self, job: _Job, twitch, broadcaster_id: str) -> None:
         self._finish(job, "running", None)
         try:
-            run_fetch(self.store, twitch, broadcaster_id)
+            run_fetch(self.store, twitch, broadcaster_id, should_stop=self._stop.is_set)
         except TwitchError as e:
             self._finish(job, "error", str(e) or "Twitch request failed")
         except Exception:
             self._finish(job, "error", "Unexpected error while loading clips")
         else:
-            self._finish(job, "done", None)
+            if self._stop.is_set():
+                self._finish(job, "error", STOPPED)
+            else:
+                self._finish(job, "done", None)

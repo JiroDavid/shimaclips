@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 
-from store import Store
+from store import SCHEMA_VERSION, Store
 from twitch import Clip, User
 
 UTC = timezone.utc
@@ -147,3 +147,97 @@ def test_state_survives_reopening_store(tmp_path):
     s2 = make(tmp_path)
     assert s2.next_pending("1") is not None
     assert s2.top_clips("1", None, None, 10, 0)[1] == 1
+
+
+def test_reset_keeps_buckets_ready(tmp_path):
+    s = make(tmp_path)
+    month = (dt(2026, 1, 1), dt(2026, 2, 1))
+    s.add_windows("1", [month])
+    s.mark_done("1", *month, dt(2026, 1, 20), False)
+    s.reset_windows("1", "all", dt(2026, 1, 21), timedelta(days=2))
+    assert s.progress("1").windows_done == 0
+    (b,) = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")
+    assert b.ready is True
+    (d,) = s.bucket_counts("1", date(2026, 1, 5), date(2026, 1, 5), "day")
+    assert d.ready is True
+
+
+def test_split_children_make_bucket_not_ready_until_fetched(tmp_path):
+    s = make(tmp_path)
+    month = (dt(2026, 1, 1), dt(2026, 2, 1))
+    s.add_windows("1", [month])
+    s.mark_done("1", *month, dt(2026, 1, 20), False)
+    s.reset_windows("1", "all", dt(2026, 1, 21), timedelta(days=2))
+    s.mark_split("1", *month, [(dt(2026, 1, d), dt(2026, 1, d + 1)) for d in range(1, 31)] + [(dt(2026, 1, 31), dt(2026, 2, 1))])
+    day = lambda: s.bucket_counts("1", date(2026, 1, 5), date(2026, 1, 5), "day")[0]
+    assert day().ready is False
+    s.mark_done("1", dt(2026, 1, 5), dt(2026, 1, 6), dt(2026, 1, 21), False)
+    assert day().ready is True
+
+
+def test_split_windows_lists_split_parents(tmp_path):
+    s = make(tmp_path)
+    month = (dt(2026, 1, 1), dt(2026, 2, 1))
+    s.add_windows("1", [month, (dt(2026, 2, 1), dt(2026, 3, 1))])
+    s.mark_split("1", *month, [(dt(2026, 1, 1), dt(2026, 1, 2))])
+    assert s.split_windows("1") == [month]
+
+
+OLD_SCHEMA = """
+CREATE TABLE streamers (broadcaster_id TEXT PRIMARY KEY, login TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL, account_created TEXT NOT NULL);
+CREATE TABLE clips (id TEXT PRIMARY KEY, broadcaster_id TEXT NOT NULL, url TEXT NOT NULL,
+    title TEXT NOT NULL, thumbnail_url TEXT NOT NULL, view_count INTEGER NOT NULL,
+    duration REAL NOT NULL, creator_name TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE windows (broadcaster_id TEXT NOT NULL, start TEXT NOT NULL, "end" TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', fetched_at TEXT, truncated INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (broadcaster_id, start, "end"));
+INSERT INTO windows VALUES ('1', '2026-01-01T00:00:00Z', '2026-02-01T00:00:00Z', 'done', '2026-03-01T00:00:00Z', 0);
+INSERT INTO windows VALUES ('1', '2026-02-01T00:00:00Z', '2026-03-01T00:00:00Z', 'split', NULL, 0);
+INSERT INTO windows VALUES ('1', '2026-02-01T00:00:00Z', '2026-02-02T00:00:00Z', 'done', '2026-03-01T00:00:00Z', 1);
+INSERT INTO windows VALUES ('1', '2026-02-02T00:00:00Z', '2026-02-03T00:00:00Z', 'pending', NULL, 0);
+INSERT INTO clips VALUES ('a', '1', 'u', 't', 'th', 5, 1.0, 'c', '2026-01-05T00:00:00Z');
+"""
+
+
+def old_db(tmp_path):
+    import sqlite3
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.executescript(OLD_SCHEMA)
+    conn.close()
+    return path
+
+
+def user_version(path):
+    import sqlite3
+    conn = sqlite3.connect(path)
+    try:
+        return conn.execute("PRAGMA user_version").fetchone()[0]
+    finally:
+        conn.close()
+
+
+def test_old_database_resets_done_leaves_once_and_keeps_clips(tmp_path):
+    path = old_db(tmp_path)
+    s = Store(path)
+    assert user_version(path) == SCHEMA_VERSION
+    p = s.progress("1")
+    assert p.windows_done == 0 and p.windows_total == 3 and p.capped == 0 and p.clips == 1
+    (b,) = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")
+    assert b.count == 1 and b.ready is False
+    assert s.split_windows("1") == [(dt(2026, 2, 1), dt(2026, 3, 1))]
+    s.mark_done("1", dt(2026, 1, 1), dt(2026, 2, 1), dt(2026, 11, 1), False)
+    s2 = Store(path)
+    assert s2.progress("1").windows_done == 1
+    assert s2.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")[0].ready is True
+
+
+def test_fresh_database_starts_at_current_version(tmp_path):
+    s = make(tmp_path)
+    assert user_version(tmp_path / "s.db") == SCHEMA_VERSION
+    month = (dt(2026, 1, 1), dt(2026, 2, 1))
+    s.add_windows("1", [month])
+    s.mark_done("1", *month, dt(2026, 3, 1), False)
+    make(tmp_path)
+    assert s.progress("1").windows_done == 1

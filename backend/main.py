@@ -1,5 +1,6 @@
 import json
 import os
+from contextlib import asynccontextmanager
 import threading
 import time
 from dataclasses import asdict
@@ -14,13 +15,24 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from jobs import JobStore, job_to_dict, run_job
-from loader import LoadManager, StreamerNotFound, normalize_login, state_to_dict
+from loader import LoadManager, LoaderUnavailable, StreamerNotFound, normalize_login, state_to_dict
 from store import Store
 from twitch import TwitchClient, TwitchError
 
 load_dotenv(Path(__file__).parent / ".env")
 
-app = FastAPI()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    with _deps_lock:
+        manager = _manager
+    if manager is not None:
+        manager.shutdown()
+
+
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -29,7 +41,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-store = JobStore()
+job_store = JobStore()
 _twitch: TwitchClient | None = None
 
 
@@ -102,6 +114,8 @@ def load_streamer(login: str, mode: str = "auto", manager: LoadManager = Depends
         streamer, state = manager.ensure(login, mode)
     except StreamerNotFound:
         raise HTTPException(404, f"Streamer '{normalize_login(login)}' not found")
+    except LoaderUnavailable:
+        raise HTTPException(503, "The server is shutting down")
     except TwitchError as e:
         raise HTTPException(502, str(e))
     return {
@@ -173,14 +187,14 @@ def start_job(job, clips) -> None:
 @app.post("/api/downloads")
 def create_download(req: DownloadRequest):
     clips = [c.model_dump() for c in req.clips]
-    job = store.create(clips)
+    job = job_store.create(clips)
     start_job(job, clips)
     return {"job_id": job.id}
 
 
 @app.get("/api/downloads/{job_id}/events")
 def download_events(job_id: str):
-    job = store.get(job_id)
+    job = job_store.get(job_id)
     if job is None:
         raise HTTPException(404, "Unknown download")
 
@@ -196,10 +210,10 @@ def download_events(job_id: str):
 
 @app.get("/api/downloads/{job_id}/file")
 def download_file(job_id: str, background: BackgroundTasks):
-    job = store.get(job_id)
+    job = job_store.get(job_id)
     if job is None:
         raise HTTPException(404, "Unknown download")
     if job.status != "done" or job.file_path is None:
         raise HTTPException(409, "Download is not ready")
-    background.add_task(store.remove, job_id)
+    background.add_task(job_store.remove, job_id)
     return FileResponse(job.file_path, filename=job.file_path.name)
