@@ -9,14 +9,16 @@ from fastapi.testclient import TestClient
 import main
 from loader import LoadManager
 from store import Store
-from twitch import Clip, ClipsResult, TwitchError, User
+from twitch import ChannelHit, Clip, ClipsResult, TwitchError, User
 
 
 CREATED = datetime(2020, 1, 1, tzinfo=timezone.utc)
 
 
 class FakeTwitch:
-    def __init__(self, logins=("jason",), error=None):
+    def __init__(self, logins=("jason",), error=None, hits=()):
+        self.hits = list(hits)
+        self.searched = []
         self.users = {l: User(str(i + 1), l, l.title(), CREATED) for i, l in enumerate(logins)}
         self.error = error
 
@@ -27,6 +29,12 @@ class FakeTwitch:
 
     def fetch_window(self, broadcaster_id, start, end):
         return ClipsResult([], False)
+
+    def search_channels(self, query, limit=8):
+        if self.error:
+            raise self.error
+        self.searched.append(query)
+        return self.hits[:limit]
 
 
 def clip(i, views, created="2026-01-02T00:00:00Z"):
@@ -261,3 +269,40 @@ def test_load_after_shutdown_returns_503(api):
     c.mgr.shutdown()
     r = c.post("/api/streamers/jason/load")
     assert r.status_code == 503
+
+
+def search_client(api, fake):
+    c = api(fake)
+    main.app.dependency_overrides[main.get_twitch] = lambda: fake
+    return c
+
+
+def test_search_returns_results_with_avatar_and_live_flag(api):
+    fake = FakeTwitch(hits=[ChannelHit("1", "jason", "Jason", "https://x/a.png", True)])
+    r = search_client(api, fake).get("/api/streamers/search?q=%20jas%20")
+    assert r.status_code == 200
+    assert r.json() == {"results": [
+        {"login": "jason", "display_name": "Jason", "avatar_url": "https://x/a.png", "is_live": True}
+    ]}
+    assert fake.searched == ["jas"]
+
+
+@pytest.mark.parametrize("q", ["", "a", "  a  ", "a" * 41])
+def test_search_rejects_short_and_long_queries_422(api, q):
+    r = search_client(api, FakeTwitch()).get("/api/streamers/search", params={"q": q})
+    assert r.status_code == 422
+    assert r.json()["detail"] == "Search must be 2-40 characters"
+
+
+def test_search_twitch_error_502(api):
+    r = search_client(api, FakeTwitch(error=TwitchError("boom"))).get("/api/streamers/search?q=jas")
+    assert r.status_code == 502
+    assert r.json()["detail"] == "boom"
+
+
+def test_search_does_not_collide_with_login_routes(api):
+    fake = FakeTwitch(hits=[ChannelHit("1", "jason", "Jason", "u", False)])
+    c = search_client(api, fake)
+    r = c.get("/api/streamers/search?q=jas")
+    assert r.status_code == 200 and "results" in r.json()
+    assert c.get("/api/streamers/search/clips").status_code == 404

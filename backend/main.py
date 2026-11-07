@@ -102,6 +102,21 @@ class DownloadRequest(BaseModel):
     clips: list[ClipRef] = Field(min_length=1)
 
 
+@app.get("/api/streamers/search")
+def search_streamers(q: str = Query(...), twitch: TwitchClient = Depends(get_twitch)):
+    q = q.strip()
+    if not 2 <= len(q) <= 40:
+        raise HTTPException(422, "Search must be 2-40 characters")
+    try:
+        hits = twitch.search_channels(q)
+    except TwitchError as e:
+        raise HTTPException(502, str(e))
+    return {"results": [
+        {"login": h.login, "display_name": h.display_name, "avatar_url": h.thumbnail_url, "is_live": h.is_live}
+        for h in hits[:8]
+    ]}
+
+
 @app.post("/api/streamers/{login}/load")
 def load_streamer(login: str, mode: str = "auto", manager: LoadManager = Depends(get_manager)):
     if mode not in ("auto", "full"):
