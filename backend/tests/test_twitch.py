@@ -124,3 +124,55 @@ def test_top_clips_sorts_by_views_and_truncates():
 def test_top_clips_n_larger_than_available():
     clips = [Clip("a", "u", "t", "", 1, 1.0, "x", "d")]
     assert top_clips(clips, 15) == clips
+
+
+def test_fetch_window_flags_truncation_at_cap():
+    def on_api(request):
+        return httpx.Response(200, json={"data": [raw_clip(i) for i in range(100)], "pagination": {"cursor": "more"}})
+
+    result = make_client(base_handler(on_api)).fetch_window("42", START, END)
+    assert result.truncated is True
+    assert len(result.clips) == 3000
+
+
+def test_fetch_window_not_truncated_below_cap():
+    client = make_client(base_handler(lambda r: httpx.Response(200, json={"data": [raw_clip(1)], "pagination": {}})))
+    result = client.fetch_window("42", START, END)
+    assert result.truncated is False
+    assert len(result.clips) == 1
+
+
+def test_get_user_returns_created_at_as_utc():
+    user_json = {"id": "42", "login": "jason", "display_name": "Jason", "created_at": "2020-05-06T07:08:09Z"}
+    client = make_client(base_handler(lambda r: httpx.Response(200, json={"data": [user_json]})))
+    user = client.get_user(" @Jason ")
+    assert user == twitch.User("42", "jason", "Jason", datetime(2020, 5, 6, 7, 8, 9, tzinfo=timezone.utc))
+    assert user.created_at.utcoffset().total_seconds() == 0
+
+
+def test_get_user_unknown_returns_none():
+    client = make_client(base_handler(lambda r: httpx.Response(200, json={"data": []})))
+    assert client.get_user("nobody") is None
+
+
+def test_get_retries_once_after_429_using_retry_after(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(twitch.time, "sleep", sleeps.append)
+    calls = {"api": 0}
+
+    def on_api(request):
+        calls["api"] += 1
+        if calls["api"] == 1:
+            return httpx.Response(429, headers={"Retry-After": "7"})
+        return httpx.Response(200, json={"data": [{"id": "42"}]})
+
+    assert make_client(base_handler(on_api)).get_user_id("a") == "42"
+    assert sleeps == [7]
+    assert calls["api"] == 2
+
+
+def test_429_gives_up_after_three_attempts(monkeypatch):
+    monkeypatch.setattr(twitch.time, "sleep", lambda s: None)
+    client = make_client(base_handler(lambda r: httpx.Response(429)))
+    with pytest.raises(TwitchError):
+        client.get_user_id("a")
