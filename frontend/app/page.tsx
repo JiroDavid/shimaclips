@@ -3,7 +3,11 @@
 import { useState } from "react";
 import CalendarView from "@/components/CalendarView";
 import LoadingBanner from "@/components/LoadingBanner";
+import ReelSection from "@/components/ReelSection";
 import StreamerEntry from "@/components/StreamerEntry";
+import { labelOfKey, rangeOfKey, todayUtc } from "@/lib/calendar";
+import { emptySelection, toggleClip, type Selection } from "@/lib/selection";
+import type { Clip } from "@/lib/api";
 import { useStreamer } from "@/lib/useStreamer";
 
 export default function Home() {
@@ -12,7 +16,24 @@ export default function Home() {
   const [selection, setSelection] = useState<{ login: string; key: string } | null>(null);
   const selectedKey = streamer && selection?.login === streamer.login ? selection.key : null;
 
+  const [picked, setPicked] = useState<{ login: string; sel: Selection } | null>(null);
+  const clipSelection = streamer && picked?.login === streamer.login ? picked.sel : emptySelection();
+
   const busy = phase === "opening" || phase === "loading";
+
+  function reelList() {
+    const today = todayUtc();
+    return [
+      { key: "month", title: "Top clips this month", range: rangeOfKey(today.slice(0, 7)) },
+      { key: "year", title: "Top clips this year", range: rangeOfKey(today.slice(0, 4)) },
+      { key: "all", title: "Most viewed of all time", range: {} },
+    ];
+  }
+
+  function toggle(clip: Clip) {
+    if (!streamer) return;
+    setPicked({ login: streamer.login, sel: toggleClip(clipSelection, clip) });
+  }
 
   function submit(login: string) {
     setLastLogin(login);
@@ -72,13 +93,34 @@ export default function Home() {
             onSelect={(key) => setSelection(key ? { login: streamer.login, key } : null)}
           />
           {selectedKey && (
-            <p className="text-sm text-zinc-400">
-              Selected: {selectedKey}{" "}
-              <button onClick={() => setSelection(null)} className="underline hover:text-zinc-200">
-                Clear
-              </button>
-            </p>
+            <ReelSection
+              key={`${streamer.login}|${selectedKey}`}
+              login={streamer.login}
+              range={rangeOfKey(selectedKey)}
+              tick={tick}
+              title={`Top clips - ${labelOfKey(selectedKey)}`}
+              selection={clipSelection}
+              onToggle={toggle}
+              loadingNote={phase === "loading"}
+              action={
+                <button onClick={() => setSelection(null)} className="text-sm underline hover:text-zinc-200">
+                  Clear
+                </button>
+              }
+            />
           )}
+          {reelList().map((r) => (
+            <ReelSection
+              key={`${streamer.login}|${r.key}`}
+              login={streamer.login}
+              range={r.range}
+              tick={tick}
+              title={r.title}
+              selection={clipSelection}
+              onToggle={toggle}
+              loadingNote={phase === "loading"}
+            />
+          ))}
         </>
       )}
     </main>

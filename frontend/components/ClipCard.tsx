@@ -19,7 +19,7 @@ export default function ClipCard({
   return (
     <label
       className={`block cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 transition ${
-        checked ? "border-purple-500" : "border-zinc-800 opacity-60"
+        checked ? "border-purple-500" : "border-zinc-800"
       }`}
     >
       <div className="relative">

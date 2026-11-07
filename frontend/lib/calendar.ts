@@ -65,3 +65,15 @@ export function isCellDisabled(
 ): boolean {
   return !ready || cellStart > today || cellEnd < accountCreated;
 }
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+export function labelOfKey(key: string): string {
+  const parts = key.split("-").map(Number);
+  if (parts.length === 1) return String(parts[0]);
+  if (parts.length === 2) return `${MONTH_NAMES[parts[1] - 1]} ${parts[0]}`;
+  return `${MONTH_NAMES[parts[1] - 1]} ${parts[2]}, ${parts[0]}`;
+}

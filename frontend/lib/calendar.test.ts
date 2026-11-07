@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { heatLevel, isCellDisabled, todayUtc, monthDays, rangeOfKey, shiftMonth, shiftWeek, weekDays } from "./calendar";
+import { heatLevel, labelOfKey, isCellDisabled, todayUtc, monthDays, rangeOfKey, shiftMonth, shiftWeek, weekDays } from "./calendar";
 
 describe("calendar", () => {
   it("weekDays starts monday", () => {
@@ -72,5 +72,11 @@ describe("calendar", () => {
     expect(isCellDisabled("2026-03-01", "2026-03-31", created, today, true)).toBe(false);
     expect(isCellDisabled("2026-02-01", "2026-02-28", created, today, true)).toBe(true);
     expect(isCellDisabled("2026-03-09", "2026-03-09", created, today, true)).toBe(true);
+  });
+
+  it("labelOfKey formats year, month and day", () => {
+    expect(labelOfKey("2026")).toBe("2026");
+    expect(labelOfKey("2026-03")).toBe("March 2026");
+    expect(labelOfKey("2026-03-14")).toBe("March 14, 2026");
   });
 });
