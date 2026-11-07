@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import CalendarView from "@/components/CalendarView";
+import DownloadPanel from "@/components/DownloadPanel";
 import LoadingBanner from "@/components/LoadingBanner";
 import ReelSection from "@/components/ReelSection";
+import SelectionPanel from "@/components/SelectionPanel";
 import StreamerEntry from "@/components/StreamerEntry";
 import { labelOfKey, rangeOfKey, todayUtc } from "@/lib/calendar";
-import { emptySelection, toggleClip, type Selection } from "@/lib/selection";
+import { emptySelection, removeClip, toggleClip, type Selection } from "@/lib/selection";
 import type { Clip } from "@/lib/api";
+import { useDownload } from "@/lib/useDownload";
 import { useStreamer } from "@/lib/useStreamer";
 
 export default function Home() {
@@ -18,6 +21,8 @@ export default function Home() {
 
   const [picked, setPicked] = useState<{ login: string; sel: Selection } | null>(null);
   const clipSelection = streamer && picked?.login === streamer.login ? picked.sel : emptySelection();
+
+  const download = useDownload(streamer?.login ?? null);
 
   const busy = phase === "opening" || phase === "loading";
 
@@ -33,6 +38,16 @@ export default function Home() {
   function toggle(clip: Clip) {
     if (!streamer) return;
     setPicked({ login: streamer.login, sel: toggleClip(clipSelection, clip) });
+  }
+
+  function remove(id: string) {
+    if (!streamer) return;
+    setPicked({ login: streamer.login, sel: removeClip(clipSelection, id) });
+  }
+
+  function clearAll() {
+    if (!streamer) return;
+    setPicked({ login: streamer.login, sel: emptySelection() });
   }
 
   function submit(login: string) {
@@ -121,6 +136,17 @@ export default function Home() {
               loadingNote={phase === "loading"}
             />
           ))}
+          {download.error && (
+            <p className="rounded border border-red-900 bg-red-950 p-3 text-sm text-red-300">{download.error}</p>
+          )}
+          {download.job && <DownloadPanel state={download.job} />}
+          <SelectionPanel
+            selection={clipSelection}
+            onRemove={remove}
+            onClear={clearAll}
+            onDownload={() => download.start(Array.from(clipSelection.values()))}
+            downloading={download.downloading}
+          />
         </>
       )}
     </main>

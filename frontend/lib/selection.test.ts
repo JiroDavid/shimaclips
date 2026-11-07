@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Clip } from "./api";
-import { emptySelection, removeClip, toggleClip } from "./selection";
+import { emptySelection, pluralClips, removeClip, toggleClip } from "./selection";
 
 const clip = (id: string, created_at: string): Clip => ({
   id,
@@ -37,5 +37,12 @@ describe("selection", () => {
     const next = removeClip(sel, "a");
     expect(next.size).toBe(0);
     expect(sel.size).toBe(1);
+  });
+});
+
+describe("pluralClips", () => {
+  it("uses singular for one and plural otherwise", () => {
+    expect(pluralClips(1)).toBe("1 clip selected");
+    expect(pluralClips(3)).toBe("3 clips selected");
   });
 });

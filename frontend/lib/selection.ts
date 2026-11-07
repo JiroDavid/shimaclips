@@ -18,3 +18,7 @@ export function removeClip(sel: Selection, id: string): Selection {
   next.delete(id);
   return next;
 }
+
+export function pluralClips(n: number): string {
+  return n === 1 ? "1 clip selected" : `${n} clips selected`;
+}
