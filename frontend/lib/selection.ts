@@ -22,3 +22,8 @@ export function removeClip(sel: Selection, id: string): Selection {
 export function pluralClips(n: number): string {
   return n === 1 ? "1 clip selected" : `${n} clips selected`;
 }
+
+export function formatClipDate(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "unknown date" : d.toISOString().slice(0, 10);
+}

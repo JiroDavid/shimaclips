@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Clip } from "./api";
-import { emptySelection, pluralClips, removeClip, toggleClip } from "./selection";
+import { emptySelection, formatClipDate, pluralClips, removeClip, toggleClip } from "./selection";
 
 const clip = (id: string, created_at: string): Clip => ({
   id,
@@ -44,5 +44,12 @@ describe("pluralClips", () => {
   it("uses singular for one and plural otherwise", () => {
     expect(pluralClips(1)).toBe("1 clip selected");
     expect(pluralClips(3)).toBe("3 clips selected");
+  });
+});
+
+describe("formatClipDate", () => {
+  it("formats UTC date and tolerates invalid input", () => {
+    expect(formatClipDate("2026-03-05T23:59:00Z")).toBe("2026-03-05");
+    expect(formatClipDate("garbage")).toBe("unknown date");
   });
 });

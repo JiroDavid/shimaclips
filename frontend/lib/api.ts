@@ -47,15 +47,28 @@ export async function startDownload(clips: Clip[]): Promise<string> {
   return (await r.json()).job_id;
 }
 
-export function watchJob(jobId: string, onUpdate: (s: JobState) => void): () => void {
+export function watchJob(jobId: string, onUpdate: (s: JobState) => void, onError?: () => void): () => void {
   const es = new EventSource(`${API}/api/downloads/${jobId}/events`);
+  let finished = false;
   es.onmessage = (e) => {
     const state: JobState = JSON.parse(e.data);
+    if (state.status !== "running") {
+      finished = true;
+      es.close();
+    }
     onUpdate(state);
-    if (state.status !== "running") es.close();
   };
-  es.onerror = () => es.close();
-  return () => es.close();
+  es.onerror = () => {
+    es.close();
+    if (!finished) {
+      finished = true;
+      onError?.();
+    }
+  };
+  return () => {
+    finished = true;
+    es.close();
+  };
 }
 
 export type Streamer = {

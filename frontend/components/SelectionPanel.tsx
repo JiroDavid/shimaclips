@@ -1,4 +1,4 @@
-import { pluralClips, type Selection } from "@/lib/selection";
+import { formatClipDate, pluralClips, type Selection } from "@/lib/selection";
 
 export default function SelectionPanel({
   selection,
@@ -16,7 +16,7 @@ export default function SelectionPanel({
   if (selection.size === 0) return null;
   const clips = Array.from(selection.values());
   return (
-    <div className="sticky bottom-4 z-10 space-y-3 rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-lg shadow-black/50">
+    <div className="space-y-3 rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-lg shadow-black/50">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm font-semibold">{pluralClips(clips.length)}</p>
         <div className="flex gap-3">
@@ -37,7 +37,7 @@ export default function SelectionPanel({
           <li key={c.id} className="flex items-center gap-3">
             <span className="min-w-0 flex-1 truncate text-zinc-200">{c.title}</span>
             <span className="shrink-0 text-zinc-400">{c.view_count.toLocaleString()} views</span>
-            <span className="shrink-0 text-zinc-500">{new Date(c.created_at).toISOString().slice(0, 10)}</span>
+            <span className="shrink-0 text-zinc-500">{formatClipDate(c.created_at)}</span>
             <button
               onClick={() => onRemove(c.id)}
               aria-label={`Remove ${c.title} from selection`}

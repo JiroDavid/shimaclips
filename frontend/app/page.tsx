@@ -136,17 +136,21 @@ export default function Home() {
               loadingNote={phase === "loading"}
             />
           ))}
-          {download.error && (
-            <p className="rounded border border-red-900 bg-red-950 p-3 text-sm text-red-300">{download.error}</p>
+          {(download.error || download.job || clipSelection.size > 0) && (
+            <div className="sticky bottom-4 z-10 space-y-3">
+              {download.error && (
+                <p className="rounded border border-red-900 bg-red-950 p-3 text-sm text-red-300">{download.error}</p>
+              )}
+              {download.job && <DownloadPanel state={download.job} />}
+              <SelectionPanel
+                selection={clipSelection}
+                onRemove={remove}
+                onClear={clearAll}
+                onDownload={() => download.start(Array.from(clipSelection.values()))}
+                downloading={download.downloading}
+              />
+            </div>
           )}
-          {download.job && <DownloadPanel state={download.job} />}
-          <SelectionPanel
-            selection={clipSelection}
-            onRemove={remove}
-            onClear={clearAll}
-            onDownload={() => download.start(Array.from(clipSelection.values()))}
-            downloading={download.downloading}
-          />
         </>
       )}
     </main>

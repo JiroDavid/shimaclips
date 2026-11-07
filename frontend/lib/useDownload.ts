@@ -35,17 +35,27 @@ export function useDownload(login: string | null) {
         if (run !== runId.current) return;
         patch({ job: { status: "running", error: null, items: [] } });
         let fired = false;
-        stopWatching.current = watchJob(jobId, (state) => {
-          if (run !== runId.current) return;
-          patch({ job: state, downloading: state.status === "running" });
-          if (state.status !== "running") downloadingRef.current = false;
-          if (state.status === "done" && !fired) {
-            fired = true;
-            const a = document.createElement("a");
-            a.href = fileUrl(jobId);
-            a.click();
-          }
-        });
+        stopWatching.current = watchJob(
+          jobId,
+          (state) => {
+            if (run !== runId.current) return;
+            patch({ job: state, downloading: state.status === "running" });
+            if (state.status !== "running") downloadingRef.current = false;
+            if (state.status === "done" && !fired) {
+              fired = true;
+              const a = document.createElement("a");
+              a.href = fileUrl(jobId);
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            }
+          },
+          () => {
+            if (run !== runId.current) return;
+            downloadingRef.current = false;
+            patch({ job: null, error: "Lost connection to the downloader", downloading: false });
+          },
+        );
       } catch (err) {
         if (run !== runId.current) return;
         downloadingRef.current = false;

@@ -8,7 +8,7 @@ export default function DownloadPanel({ state }: { state: JobState }) {
         {state.status === "done" && "Done - your browser download should start now"}
         {state.status === "error" && `Failed: ${state.error}`}
       </p>
-      <ul className="space-y-1 text-xs">
+      <ul className="max-h-48 space-y-1 overflow-y-auto text-xs">
         {state.items.map((item) => (
           <li key={item.name} className="flex items-center justify-between gap-3">
             <span className="truncate text-zinc-300">{item.name}</span>
