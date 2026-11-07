@@ -24,14 +24,6 @@ export type JobState = {
   items: JobItem[];
 };
 
-export type SearchBody = {
-  streamer: string;
-  count: number;
-  month?: string;
-  start?: string;
-  end?: string;
-};
-
 async function errorMessage(r: Response): Promise<string> {
   try {
     const body = await r.json();
@@ -41,16 +33,6 @@ async function errorMessage(r: Response): Promise<string> {
     }
   } catch {}
   return `Request failed (${r.status})`;
-}
-
-export async function searchClips(body: SearchBody): Promise<{ clips: Clip[]; total_in_window: number }> {
-  const r = await fetch(`${API}/api/clips/search`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(await errorMessage(r));
-  return r.json();
 }
 
 export async function startDownload(clips: Clip[]): Promise<string> {
@@ -107,15 +89,29 @@ export async function loadStreamer(
   return r.json();
 }
 
-export function watchStreamer(login: string, onUpdate: (s: LoadState) => void): () => void {
+export function watchStreamer(
+  login: string,
+  onUpdate: (s: LoadState) => void,
+  onError?: () => void,
+): () => void {
   const es = new EventSource(`${API}/api/streamers/${encodeURIComponent(login)}/events`);
+  let finished = false;
   es.onmessage = (e) => {
     const state: LoadState = JSON.parse(e.data);
+    if (state.status === "done" || state.status === "error") {
+      finished = true;
+      es.close();
+    }
     onUpdate(state);
-    if (state.status === "done" || state.status === "error") es.close();
   };
-  es.onerror = () => es.close();
-  return () => es.close();
+  es.onerror = () => {
+    es.close();
+    if (!finished) onError?.();
+  };
+  return () => {
+    finished = true;
+    es.close();
+  };
 }
 
 export async function getCalendar(
