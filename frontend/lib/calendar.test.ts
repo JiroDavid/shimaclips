@@ -12,6 +12,17 @@ describe("calendar", () => {
     expect(weekDays("2026-11-02")[0]).toBe("2026-11-02");
   });
 
+  it("weekDays for a sunday anchor crosses a year boundary", () => {
+    expect(weekDays("2027-01-01")[0]).toBe("2026-12-28");
+    expect(weekDays("2027-01-01")[6]).toBe("2027-01-03");
+    expect(weekDays("2026-01-04")[0]).toBe("2025-12-29");
+    expect(weekDays("2026-01-04")[6]).toBe("2026-01-04");
+  });
+
+  it("shiftWeek forward across a month end", () => {
+    expect(shiftWeek("2026-10-28", 1)).toBe("2026-11-04");
+  });
+
   it("shiftWeek crosses month and year", () => {
     expect(shiftWeek("2026-11-08", 1)).toBe("2026-11-15");
     expect(shiftWeek("2026-01-03", -1)).toBe("2025-12-27");

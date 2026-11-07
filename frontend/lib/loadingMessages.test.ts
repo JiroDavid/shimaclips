@@ -25,7 +25,10 @@ describe("bannerMessage", () => {
     expect(bannerMessage(90000, 0).text).not.toContain("still going, this one is big");
   });
 
-  it("tick wraps around", () => {
-    expect(bannerMessage(1000, 100).text).toBeTruthy();
+  it("tick wraps around each pool", () => {
+    for (const [elapsed, len] of [[1000, 3], [30000, 3], [100000, 2]]) {
+      expect(bannerMessage(elapsed, len).text).toBe(bannerMessage(elapsed, 0).text);
+      expect(bannerMessage(elapsed, len + 1).text).toBe(bannerMessage(elapsed, 1).text);
+    }
   });
 });

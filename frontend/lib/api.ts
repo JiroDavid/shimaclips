@@ -88,7 +88,7 @@ export type LoadState = {
   windows_done: number;
   windows_total: number;
   clips: number;
-  capped: boolean;
+  capped: number;
   started_at: number;
 };
 
