@@ -3,31 +3,52 @@
 import { useEffect, useRef, useState } from "react";
 import { getClips, type Clip } from "@/lib/api";
 import { createLatest } from "@/lib/latest";
+import { appendUnique, nextPage } from "@/lib/paging";
 
 const PAGE = 10;
-export const MAX_LIMIT = 100;
 const NONE: Clip[] = [];
 
 type Settled = { id: string; clips: Clip[]; total: number; error: string | null };
+
+async function fetchTop(
+  login: string,
+  start: string | undefined,
+  end: string | undefined,
+  limit: number,
+  signal: AbortSignal,
+): Promise<{ clips: Clip[]; total: number }> {
+  let clips: Clip[] = [];
+  let fetched = 0;
+  let total: number | null = null;
+  for (let page = nextPage(0, limit, null); page; page = nextPage(fetched, limit, total)) {
+    if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+    const res = await getClips(login, { start, end, ...page }, signal);
+    total = res.total;
+    fetched += res.clips.length;
+    clips = appendUnique(clips, res.clips);
+    if (res.clips.length === 0) break;
+  }
+  return { clips, total: total ?? 0 };
+}
 
 export function useClips(
   login: string | null,
   range: { start?: string; end?: string } | null,
   tick: number,
-): { clips: Clip[]; total: number; loading: boolean; error: string | null; showMore(): void; hasMore: boolean; capped: boolean } {
+): { clips: Clip[]; total: number; loading: boolean; error: string | null; showMore(): void; hasMore: boolean } {
   const [limit, setLimit] = useState(PAGE);
   const [settled, setSettled] = useState<Settled>({ id: "", clips: NONE, total: 0, error: null });
   const latest = useRef(createLatest());
   const start = range?.start;
   const end = range?.end;
   const enabled = !!login && range !== null;
-  const id = `${login}|${start ?? ""}|${end ?? ""}|${limit}|${tick}`;
+  const id = `${enabled}|${login}|${start ?? ""}|${end ?? ""}|${limit}|${tick}`;
 
   useEffect(() => {
-    if (!login || range === null) return;
+    if (!enabled || !login) return;
     let cancelled = false;
     latest.current
-      .run((signal) => getClips(login, { start, end, limit, offset: 0 }, signal))
+      .run((signal) => fetchTop(login, start, end, limit, signal))
       .then((res) => {
         if (cancelled || !res.ok) return;
         setSettled({ id, clips: res.value.clips, total: res.value.total, error: null });
@@ -40,18 +61,15 @@ export function useClips(
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [enabled, login, start, end, limit, tick, id]);
 
-  if (!enabled) return { clips: NONE, total: 0, loading: false, error: null, showMore() {}, hasMore: false, capped: false };
-  const capped = limit >= MAX_LIMIT && settled.total > MAX_LIMIT;
+  if (!enabled) return { clips: NONE, total: 0, loading: false, error: null, showMore() {}, hasMore: false };
   return {
     clips: settled.clips,
     total: settled.total,
     loading: settled.id !== id,
     error: settled.error,
-    showMore: () => setLimit((l) => Math.min(l + PAGE, MAX_LIMIT)),
-    hasMore: settled.clips.length < settled.total && limit < MAX_LIMIT,
-    capped,
+    showMore: () => setLimit((l) => l + PAGE),
+    hasMore: settled.clips.length < settled.total,
   };
 }

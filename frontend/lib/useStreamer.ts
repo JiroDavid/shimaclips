@@ -22,6 +22,7 @@ export function useStreamer() {
   const latest = useRef(createLatest());
   const lastTickAt = useRef(0);
   const lastClips = useRef(-1);
+  const lastDone = useRef(-1);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setPhase = useCallback((p: Phase) => {
@@ -51,8 +52,9 @@ export function useStreamer() {
       setState(s);
       if (s.status === "queued" || s.status === "running") {
         setPhase("loading");
-        if (s.clips === lastClips.current) return;
+        if (s.clips === lastClips.current && s.windows_done === lastDone.current) return;
         lastClips.current = s.clips;
+        lastDone.current = s.windows_done;
         const wait = lastTickAt.current + TICK_INTERVAL_MS - Date.now();
         if (wait <= 0) bump();
         else if (!timer.current) {
@@ -63,6 +65,7 @@ export function useStreamer() {
         return;
       }
       lastClips.current = s.clips;
+      lastDone.current = s.windows_done;
       if (s.status === "done") {
         setError(null);
         setPhase("ready");
@@ -81,6 +84,7 @@ export function useStreamer() {
       stop();
       loginRef.current = login;
       lastClips.current = -1;
+      lastDone.current = -1;
       lastTickAt.current = 0;
       if (!keepStreamer) setStreamer(null);
       setState(null);

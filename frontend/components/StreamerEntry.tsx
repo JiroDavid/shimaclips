@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 
-export default function StreamerEntry({
-  onSubmit,
-  disabled,
-}: {
-  onSubmit: (login: string) => void;
-  disabled?: boolean;
-}) {
+export default function StreamerEntry({ onSubmit }: { onSubmit: (login: string) => void }) {
   const [value, setValue] = useState("");
 
   function submit(e: React.FormEvent) {
@@ -29,7 +23,7 @@ export default function StreamerEntry({
           className="rounded bg-zinc-800 px-3 py-2"
         />
       </label>
-      <button type="submit" disabled={disabled} className="rounded bg-purple-600 px-4 py-2 font-medium hover:bg-purple-500 disabled:opacity-50">
+      <button type="submit" className="rounded bg-purple-600 px-4 py-2 font-medium hover:bg-purple-500">
         Go
       </button>
     </form>

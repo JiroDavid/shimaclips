@@ -27,3 +27,7 @@ export function formatClipDate(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "unknown date" : d.toISOString().slice(0, 10);
 }
+
+export function isNewStreamer(owner: string | null, login: string | null): boolean {
+  return login !== null && login !== owner;
+}

@@ -8,7 +8,7 @@ import ReelSection from "@/components/ReelSection";
 import SelectionPanel from "@/components/SelectionPanel";
 import StreamerEntry from "@/components/StreamerEntry";
 import { labelOfKey, rangeOfKey, todayUtc } from "@/lib/calendar";
-import { emptySelection, removeClip, toggleClip, type Selection } from "@/lib/selection";
+import { emptySelection, isNewStreamer, removeClip, toggleClip, type Selection } from "@/lib/selection";
 import type { Clip } from "@/lib/api";
 import { useDownload } from "@/lib/useDownload";
 import { useStreamer } from "@/lib/useStreamer";
@@ -16,13 +16,21 @@ import { useStreamer } from "@/lib/useStreamer";
 export default function Home() {
   const { streamer, state, phase, error, tick, startedAt, open, refresh } = useStreamer();
   const [lastLogin, setLastLogin] = useState("");
+  const [owner, setOwner] = useState<string | null>(null);
   const [selection, setSelection] = useState<{ login: string; key: string } | null>(null);
   const selectedKey = streamer && selection?.login === streamer.login ? selection.key : null;
 
   const [picked, setPicked] = useState<{ login: string; sel: Selection } | null>(null);
   const clipSelection = streamer && picked?.login === streamer.login ? picked.sel : emptySelection();
 
-  const download = useDownload(streamer?.login ?? null);
+  const shownLogin = streamer?.login ?? null;
+  if (isNewStreamer(owner, shownLogin)) {
+    setOwner(shownLogin);
+    setSelection(null);
+    setPicked(null);
+  }
+
+  const download = useDownload(owner);
 
   const busy = phase === "opening" || phase === "loading";
 

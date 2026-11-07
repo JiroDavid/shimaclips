@@ -24,14 +24,13 @@ export default function ReelSection({
   loadingNote?: boolean;
   action?: React.ReactNode;
 }) {
-  const { clips, total, loading, error, showMore, hasMore, capped } = useClips(login, range, tick);
+  const { clips, total, loading, error, showMore, hasMore } = useClips(login, range, tick);
   return (
     <ClipReel
       title={title}
       clips={clips}
       total={total}
       hasMore={hasMore}
-      capped={capped}
       onShowMore={showMore}
       loading={loading}
       loadingNote={loadingNote}

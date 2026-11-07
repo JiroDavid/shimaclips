@@ -7,7 +7,6 @@ export default function ClipReel({
   clips,
   total,
   hasMore,
-  capped = false,
   onShowMore,
   loading,
   loadingNote = false,
@@ -20,7 +19,6 @@ export default function ClipReel({
   clips: Clip[];
   total: number;
   hasMore: boolean;
-  capped?: boolean;
   onShowMore: () => void;
   loading: boolean;
   loadingNote?: boolean;
@@ -46,7 +44,6 @@ export default function ClipReel({
           <ClipCard key={clip.id} clip={clip} rank={i + 1} checked={selection.has(clip.id)} onToggle={() => onToggle(clip)} />
         ))}
       </div>
-      {capped && <p className="text-sm text-zinc-400">Showing the top 100</p>}
       {hasMore && (
         <button
           onClick={onShowMore}

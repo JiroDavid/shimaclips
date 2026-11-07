@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Clip } from "./api";
-import { emptySelection, formatClipDate, pluralClips, removeClip, toggleClip } from "./selection";
+import { emptySelection, formatClipDate, isNewStreamer, pluralClips, removeClip, toggleClip } from "./selection";
 
 const clip = (id: string, created_at: string): Clip => ({
   id,
@@ -51,5 +51,14 @@ describe("formatClipDate", () => {
   it("formats UTC date and tolerates invalid input", () => {
     expect(formatClipDate("2026-03-05T23:59:00Z")).toBe("2026-03-05");
     expect(formatClipDate("garbage")).toBe("unknown date");
+  });
+});
+
+describe("isNewStreamer", () => {
+  it("is true only when a different streamer is shown", () => {
+    expect(isNewStreamer(null, "a")).toBe(true);
+    expect(isNewStreamer("a", "a")).toBe(false);
+    expect(isNewStreamer("a", null)).toBe(false);
+    expect(isNewStreamer("a", "b")).toBe(true);
   });
 });

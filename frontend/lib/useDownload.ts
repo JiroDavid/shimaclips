@@ -16,6 +16,7 @@ export function useDownload(login: string | null) {
     stopWatching.current?.();
     stopWatching.current = null;
     downloadingRef.current = false;
+    setSlot(null);
   }, []);
 
   useEffect(() => cancel, [login, cancel]);
