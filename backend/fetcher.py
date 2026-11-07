@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
@@ -47,19 +48,23 @@ def _children(start: datetime, end: datetime, now: datetime) -> list[tuple[datet
 
 
 def plan_windows(store: Store, user: User, mode: str, now: datetime) -> None:
-    if mode not in ("auto", "full"):
+    if mode not in ("auto", "full", "resume"):
         raise ValueError(f"unknown fetch mode: {mode}")
     store.add_windows(user.id, month_windows(user.created_at, now))
     for start, end in store.split_windows(user.id):
         store.add_windows(user.id, _children(start, end, now))
+    if mode == "resume":
+        return
     store.reset_windows(user.id, "nonfinal" if mode == "auto" else "all", now, GRACE)
 
 
 def run_fetch(store: Store, twitch, broadcaster_id: str,
               now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
-              should_stop: Callable[[], bool] | None = None) -> None:
+              should_stop: Callable[[], bool] | None = None,
+              allowed_years: Callable[[], set[int]] | None = None,
+              coarse_only: bool = False, delay: float = 0.0) -> None:
     while not (should_stop and should_stop()):
-        w = store.next_pending(broadcaster_id)
+        w = store.next_pending(broadcaster_id, allowed_years() if allowed_years else None, coarse_only)
         if w is None:
             return
         result = twitch.fetch_window(broadcaster_id, w.start, w.end)
@@ -71,3 +76,6 @@ def run_fetch(store: Store, twitch, broadcaster_id: str,
                 store.mark_split(broadcaster_id, w.start, w.end, children)
                 continue
         store.mark_done(broadcaster_id, w.start, w.end, now(), truncated)
+        if delay > 0 and store.next_pending(
+                broadcaster_id, allowed_years() if allowed_years else None, coarse_only):
+            time.sleep(delay)

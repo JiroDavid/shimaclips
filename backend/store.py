@@ -7,7 +7,7 @@ from pathlib import Path
 from twitch import Clip, User
 
 _FMT = "%Y-%m-%dT%H:%M:%SZ"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _enc(d: datetime) -> str:
@@ -84,7 +84,22 @@ CREATE TABLE IF NOT EXISTS windows (
     has_data INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (broadcaster_id, start, "end")
 );
+CREATE TABLE IF NOT EXISTS streamer_years (
+    broadcaster_id TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    enabled INTEGER NOT NULL,
+    PRIMARY KEY (broadcaster_id, year)
+);
 """
+
+_MONTH_SIZED = 'julianday("end") - julianday(start) >= 27'
+
+
+def _in_scope(allowed_years: set[int] | None) -> tuple[str, list]:
+    if allowed_years is None:
+        return "1", []
+    marks = ", ".join("?" for _ in allowed_years)
+    return f"({_MONTH_SIZED} OR CAST(substr(start, 1, 4) AS INTEGER) IN ({marks}))", sorted(allowed_years)
 
 
 class Store:
@@ -99,7 +114,7 @@ class Store:
             with conn:
                 version = conn.execute("PRAGMA user_version").fetchone()[0]
                 if version < SCHEMA_VERSION:
-                    if existing:
+                    if existing and version < 2:
                         self._migrate(conn)
                     conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
@@ -174,14 +189,41 @@ class Store:
             bool(r["truncated"]),
         )
 
-    def next_pending(self, broadcaster_id: str) -> Window | None:
+    def next_pending(self, broadcaster_id: str, allowed_years: set[int] | None = None,
+                     coarse_only: bool = False) -> Window | None:
+        sql = "SELECT * FROM windows WHERE broadcaster_id = ? AND status = 'pending'"
+        args: list = [broadcaster_id]
+        if coarse_only:
+            sql += f" AND {_MONTH_SIZED}"
+        else:
+            expr, extra = _in_scope(allowed_years)
+            sql += f" AND {expr}"
+            args += extra
+        sql += f' ORDER BY ({_MONTH_SIZED}) DESC, "end" DESC, start DESC LIMIT 1'
         with closing(self._connect()) as conn:
-            r = conn.execute(
-                'SELECT * FROM windows WHERE broadcaster_id = ? AND status = \'pending\' '
-                'ORDER BY "end" DESC, start DESC LIMIT 1',
-                (broadcaster_id,),
-            ).fetchone()
+            r = conn.execute(sql, args).fetchone()
         return self._window(r) if r else None
+
+    def exact_years(self, broadcaster_id: str, current_year: int) -> set[int]:
+        years = {current_year, current_year - 1}
+        with closing(self._connect()) as conn:
+            rows = conn.execute(
+                "SELECT year, enabled FROM streamer_years WHERE broadcaster_id = ?",
+                (broadcaster_id,),
+            ).fetchall()
+        for r in rows:
+            if r["enabled"]:
+                years.add(r["year"])
+            else:
+                years.discard(r["year"])
+        return years
+
+    def set_exact_year(self, broadcaster_id: str, year: int, enabled: bool) -> None:
+        self._write(
+            "INSERT INTO streamer_years (broadcaster_id, year, enabled) VALUES (?, ?, ?) "
+            "ON CONFLICT(broadcaster_id, year) DO UPDATE SET enabled=excluded.enabled",
+            [(broadcaster_id, year, int(enabled))],
+        )
 
     def mark_done(self, broadcaster_id: str, start: datetime, end: datetime,
                   fetched_at: datetime, truncated: bool) -> None:
@@ -283,14 +325,16 @@ class Store:
         ]
         return clips, total
 
-    def progress(self, broadcaster_id: str) -> Progress:
+    def progress(self, broadcaster_id: str, allowed_years: set[int] | None = None) -> Progress:
+        expr, extra = _in_scope(allowed_years)
         with closing(self._connect()) as conn:
             w = conn.execute(
                 "SELECT COUNT(*) AS total, "
                 "COALESCE(SUM(status = 'done'), 0) AS done, "
                 "COALESCE(SUM(status = 'done' AND truncated = 1), 0) AS capped "
-                "FROM windows WHERE broadcaster_id = ? AND status != 'split'",
-                (broadcaster_id,),
+                "FROM windows WHERE broadcaster_id = ? AND status != 'split'"
+                f" AND (status = 'done' OR {expr})",
+                [broadcaster_id, *extra],
             ).fetchone()
             clips = conn.execute(
                 "SELECT COUNT(*) FROM clips WHERE broadcaster_id = ?", (broadcaster_id,)

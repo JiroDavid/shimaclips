@@ -241,3 +241,99 @@ def test_fresh_database_starts_at_current_version(tmp_path):
     s.mark_done("1", *month, dt(2026, 3, 1), False)
     make(tmp_path)
     assert s.progress("1").windows_done == 1
+
+
+def _mixed(tmp_path):
+    s = make(tmp_path)
+    s.add_windows("1", [
+        (dt(2025, 12, 1), dt(2026, 1, 1)),
+        (dt(2026, 1, 1), dt(2026, 2, 1)),
+        (dt(2026, 1, 10), dt(2026, 1, 11)),
+        (dt(2025, 12, 5), dt(2025, 12, 6)),
+        (dt(2026, 1, 10, 3), dt(2026, 1, 10, 4)),
+    ])
+    return s
+
+
+def test_next_pending_returns_all_months_before_any_day(tmp_path):
+    s = _mixed(tmp_path)
+    order = []
+    while (w := s.next_pending("1")) is not None:
+        order.append((w.start, w.end))
+        s.mark_done("1", w.start, w.end, dt(2026, 3, 1), False)
+    assert order == [
+        (dt(2026, 1, 1), dt(2026, 2, 1)),
+        (dt(2025, 12, 1), dt(2026, 1, 1)),
+        (dt(2026, 1, 10), dt(2026, 1, 11)),
+        (dt(2026, 1, 10, 3), dt(2026, 1, 10, 4)),
+        (dt(2025, 12, 5), dt(2025, 12, 6)),
+    ]
+
+
+def test_next_pending_skips_days_outside_allowed_years(tmp_path):
+    s = _mixed(tmp_path)
+    for _ in range(2):
+        w = s.next_pending("1", {2026})
+        s.mark_done("1", w.start, w.end, dt(2026, 3, 1), False)
+    seen = []
+    while (w := s.next_pending("1", {2026})) is not None:
+        seen.append(w.start)
+        s.mark_done("1", w.start, w.end, dt(2026, 3, 1), False)
+    assert seen == [dt(2026, 1, 10), dt(2026, 1, 10, 3)]
+    assert s.next_pending("1", set()) is None
+    assert s.next_pending("1").start == dt(2025, 12, 5)
+
+
+def test_coarse_only_never_returns_day_windows(tmp_path):
+    s = _mixed(tmp_path)
+    for _ in range(2):
+        w = s.next_pending("1", None, True)
+        s.mark_done("1", w.start, w.end, dt(2026, 3, 1), False)
+    assert s.next_pending("1", None, True) is None
+    assert s.next_pending("1") is not None
+
+
+def test_exact_years_default_is_current_and_previous(tmp_path):
+    s = make(tmp_path)
+    assert s.exact_years("1", 2026) == {2026, 2025}
+
+
+def test_exact_years_overrides_enable_and_disable(tmp_path):
+    s = make(tmp_path)
+    s.set_exact_year("1", 2023, True)
+    s.set_exact_year("1", 2025, False)
+    assert s.exact_years("1", 2026) == {2026, 2023}
+    s.set_exact_year("1", 2025, True)
+    s.set_exact_year("1", 2023, False)
+    assert s.exact_years("1", 2026) == {2026, 2025}
+    assert s.exact_years("2", 2026) == {2026, 2025}
+
+
+def test_progress_excludes_out_of_scope_fine_windows(tmp_path):
+    s = _mixed(tmp_path)
+    assert s.progress("1").windows_total == 5
+    p = s.progress("1", {2026})
+    assert p.windows_total == 4
+    s.mark_done("1", dt(2025, 12, 5), dt(2025, 12, 6), dt(2026, 3, 1), False)
+    p = s.progress("1", {2026})
+    assert p.windows_total == 5 and p.windows_done == 1
+    s.mark_split("1", dt(2025, 12, 1), dt(2026, 1, 1), [])
+    assert s.progress("1", {2026}).windows_total == 4
+
+
+def test_version_2_database_gets_years_table_without_reset(tmp_path):
+    import sqlite3
+    s = make(tmp_path)
+    month = (dt(2026, 1, 1), dt(2026, 2, 1))
+    s.add_windows("1", [month])
+    s.mark_done("1", *month, dt(2026, 3, 1), False)
+    path = tmp_path / "s.db"
+    conn = sqlite3.connect(path)
+    conn.execute("DROP TABLE streamer_years")
+    conn.execute("PRAGMA user_version = 2")
+    conn.close()
+    s2 = Store(path)
+    assert user_version(path) == SCHEMA_VERSION == 3
+    assert s2.progress("1").windows_done == 1
+    s2.set_exact_year("1", 2020, True)
+    assert 2020 in s2.exact_years("1", 2026)

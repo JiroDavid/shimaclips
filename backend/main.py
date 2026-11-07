@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 import threading
 import time
 from dataclasses import asdict
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -141,6 +141,28 @@ def load_streamer(login: str, mode: str = "auto", manager: LoadManager = Depends
         },
         "state": state_to_dict(state),
     }
+
+
+class YearToggle(BaseModel):
+    enabled: bool
+
+
+@app.put("/api/streamers/{login}/years/{year}")
+def set_streamer_year(login: str, year: int, body: YearToggle,
+                      manager: LoadManager = Depends(get_manager)):
+    if not 2005 <= year <= datetime.now(timezone.utc).year + 1:
+        raise HTTPException(422, "Year is out of range")
+    try:
+        manager.set_year(login, year, body.enabled)
+    except ValueError:
+        raise HTTPException(422, "Streamer name must be 1-25 letters, numbers or underscores")
+    except StreamerNotFound:
+        raise HTTPException(404, "Unknown streamer")
+    except LoaderUnavailable:
+        raise HTTPException(503, "The server is shutting down")
+    except TwitchError as e:
+        raise HTTPException(502, str(e))
+    return {"year": year, "enabled": body.enabled}
 
 
 @app.get("/api/streamers/{login}/events")

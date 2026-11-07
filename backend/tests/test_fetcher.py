@@ -261,3 +261,47 @@ def test_run_fetch_stops_between_windows(tmp_path):
     assert len(twitch.calls) == 1
     assert store.progress("1").windows_done == 1
     assert store.next_pending("1").start == dt(2026, 2, 1)
+
+
+def test_run_fetch_finishes_when_only_out_of_scope_windows_remain(tmp_path):
+    store = make(tmp_path)
+    store.add_windows("1", [(dt(2020, 1, 1), dt(2020, 1, 2)), (dt(2026, 1, 1), dt(2026, 2, 1))])
+    twitch = FakeTwitch()
+    run_fetch(store, twitch, "1", allowed_years=lambda: {2026})
+    assert twitch.calls == [(dt(2026, 1, 1), dt(2026, 2, 1))]
+    assert store.next_pending("1") is not None
+
+
+def test_run_fetch_picks_up_year_enabled_mid_run(tmp_path):
+    store = make(tmp_path)
+    store.add_windows("1", [(dt(2020, 1, 1), dt(2020, 1, 2)), (dt(2026, 1, 1), dt(2026, 2, 1))])
+    allowed = {2026}
+
+    class Enabling(FakeTwitch):
+        def fetch_window(self, broadcaster_id, start, end):
+            allowed.add(2020)
+            return super().fetch_window(broadcaster_id, start, end)
+
+    twitch = Enabling()
+    run_fetch(store, twitch, "1", allowed_years=lambda: allowed)
+    assert [s for s, _ in twitch.calls] == [dt(2026, 1, 1), dt(2020, 1, 1)]
+
+
+def test_plan_resume_adds_windows_without_resetting_done(tmp_path):
+    store = make(tmp_path)
+    plan_windows(store, user(dt(2026, 1, 5)), "full", dt(2026, 1, 20))
+    run_fetch(store, FakeTwitch(), "1")
+    plan_windows(store, user(dt(2026, 1, 5)), "resume", dt(2026, 2, 10))
+    p = store.progress("1")
+    assert p.windows_done == 1 and p.windows_total == 2
+    assert store.next_pending("1").start == dt(2026, 2, 1)
+
+
+def test_delay_is_applied_between_windows(tmp_path, monkeypatch):
+    import fetcher
+    store = make(tmp_path)
+    plan_windows(store, user(dt(2026, 1, 5)), "full", dt(2026, 3, 10))
+    sleeps = []
+    monkeypatch.setattr(fetcher.time, "sleep", sleeps.append)
+    run_fetch(store, FakeTwitch(), "1", delay=0.5)
+    assert sleeps == [0.5, 0.5]

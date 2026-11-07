@@ -8,7 +8,7 @@ from typing import Callable
 
 from fetcher import plan_windows, run_fetch
 from store import Store, Streamer
-from twitch import TwitchClient, TwitchError
+from twitch import TwitchClient, TwitchError, User
 
 _LOGIN = re.compile(r"^[a-z0-9_]{1,25}$")
 
@@ -110,10 +110,38 @@ class LoadManager:
                 if job.status == "queued":
                     job.status, job.error = "error", STOPPED
 
+    def _exact_years(self, broadcaster_id: str) -> set[int]:
+        return self.store.exact_years(broadcaster_id, datetime.now(timezone.utc).year)
+
+    def set_year(self, login: str, year: int, enabled: bool) -> None:
+        login = normalize_login(login)
+        if self._stop.is_set():
+            raise LoaderUnavailable()
+        streamer = self.store.get_streamer(login)
+        if streamer is None:
+            raise StreamerNotFound(login)
+        bid = streamer.broadcaster_id
+        self.store.set_exact_year(bid, year, enabled)
+        if not enabled:
+            return
+        with self._lock:
+            job = self._jobs.get(bid)
+            if job is not None and job.status in ("queued", "running"):
+                return
+            twitch = self.twitch_factory()
+            user = User(bid, streamer.login, streamer.display_name, streamer.account_created)
+            plan_windows(self.store, user, "resume", datetime.now(timezone.utc))
+            job = _Job("queued", None, time.time())
+            try:
+                self._pool.submit(self._run, job, twitch, bid)
+            except RuntimeError:
+                raise LoaderUnavailable()
+            self._jobs[bid] = job
+
     def _snapshot(self, broadcaster_id: str, job: _Job) -> LoadState:
         with self._lock:
             status, error, started_at = job.status, job.error, job.started_at
-        p = self.store.progress(broadcaster_id)
+        p = self.store.progress(broadcaster_id, self._exact_years(broadcaster_id))
         return LoadState(status, error, p.windows_done, p.windows_total, p.clips, p.capped, started_at)
 
     def _finish(self, job: _Job, status: str, error: str | None) -> None:
@@ -124,7 +152,8 @@ class LoadManager:
     def _run(self, job: _Job, twitch, broadcaster_id: str) -> None:
         self._finish(job, "running", None)
         try:
-            run_fetch(self.store, twitch, broadcaster_id, should_stop=self._stop.is_set)
+            run_fetch(self.store, twitch, broadcaster_id, should_stop=self._stop.is_set,
+                      allowed_years=lambda: self._exact_years(broadcaster_id))
         except TwitchError as e:
             self._finish(job, "error", str(e) or "Twitch request failed")
         except Exception:

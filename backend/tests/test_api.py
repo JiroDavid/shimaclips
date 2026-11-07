@@ -306,3 +306,21 @@ def test_search_does_not_collide_with_login_routes(api):
     r = c.get("/api/streamers/search?q=jas")
     assert r.status_code == 200 and "results" in r.json()
     assert c.get("/api/streamers/search/clips").status_code == 404
+
+
+def test_put_year_toggles_and_validates(api):
+    c = api()
+    c.post("/api/streamers/jason/load")
+    wait_done(c)
+    now_year = datetime.now(timezone.utc).year
+    r = c.put("/api/streamers/Jason/years/2019", json={"enabled": True})
+    assert r.status_code == 200 and r.json() == {"year": 2019, "enabled": True}
+    assert 2019 in c.store.exact_years("1", now_year)
+    r = c.put("/api/streamers/jason/years/2019", json={"enabled": False})
+    assert r.json() == {"year": 2019, "enabled": False}
+    assert 2019 not in c.store.exact_years("1", now_year)
+    assert c.put("/api/streamers/nobody/years/2019", json={"enabled": True}).status_code == 404
+    assert c.put("/api/streamers/jason/years/2004", json={"enabled": True}).status_code == 422
+    assert c.put(f"/api/streamers/jason/years/{now_year + 2}", json={"enabled": True}).status_code == 422
+    assert c.put(f"/api/streamers/jason/years/{now_year + 1}", json={"enabled": True}).status_code == 200
+    assert c.put("/api/streamers/jason/years/2019", json={}).status_code == 422

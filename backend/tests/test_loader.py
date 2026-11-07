@@ -198,3 +198,44 @@ def test_shutdown_marks_queued_jobs_stopped(env):
     twitch.release("beta")
     assert wait_for(lambda: mgr.state("alpha").status == "error" and mgr.state("beta").status == "error")
     assert "3" not in twitch.calls
+
+
+def test_set_year_enable_starts_resume_job_when_idle(env):
+    twitch, store, mgr = env
+    mgr.ensure("alpha")
+    assert wait_for(lambda: mgr.state("alpha").status == "done")
+    before = twitch.calls["1"]
+    mgr.set_year("Alpha", 2019, True)
+    assert 2019 in store.exact_years("1", datetime.now(timezone.utc).year)
+    assert wait_for(lambda: mgr.state("alpha").status == "done")
+    assert twitch.calls["1"] == before
+
+
+def test_set_year_enable_runs_newly_scoped_windows(env):
+    twitch, store, mgr = env
+    store.upsert_streamer(twitch.users["alpha"])
+    store.add_windows("1", [(datetime(2019, 3, 1, tzinfo=UTC), datetime(2019, 3, 2, tzinfo=UTC))])
+    mgr.set_year("alpha", 2019, True)
+    assert wait_for(lambda: mgr.state("alpha").status == "done")
+    assert store.next_pending("1") is None
+    assert twitch.calls["1"] == 3
+
+
+def test_set_year_disable_leaves_running_job_alone(env):
+    twitch, store, mgr = env
+    twitch.hold("alpha")
+    mgr.ensure("alpha")
+    assert twitch.entered["1"].wait(5)
+    mgr.set_year("alpha", 2025, False)
+    assert 2025 not in store.exact_years("1", datetime.now(timezone.utc).year)
+    assert mgr.state("alpha").status == "running"
+    twitch.release("alpha")
+    assert wait_for(lambda: mgr.state("alpha").status == "done")
+
+
+def test_set_year_unknown_streamer_raises(env):
+    _, _, mgr = env
+    with pytest.raises(StreamerNotFound):
+        mgr.set_year("nobody", 2024, True)
+    with pytest.raises(ValueError):
+        mgr.set_year("a/b", 2024, True)
