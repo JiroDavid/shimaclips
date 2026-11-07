@@ -3,13 +3,16 @@
 Browse a streamer's Twitch clips on a calendar and download the best ones.
 
 ## How it works
-1. Enter a streamer's name.
-2. A heatmap shows clip density by year, month and week.
+1. Search for a streamer. Matches appear with their profile pictures so you can pick the right channel.
+2. A heatmap shows clip density by year, month and week. Cells that are still loading show an approximate count like `1,000+` and are already clickable once some of their clips are loaded.
 3. Click a month or a day to see its top clips.
-4. Reels show the top clips for this month, this year and most viewed of all time.
+4. Reels show the top clips for this month, this year and most viewed of all time. They are fetched live from Twitch, so they appear within seconds even for very popular streamers.
 5. Select clips across different periods and download them in one batch.
 
-The first load of a very popular streamer can take a few minutes. Later visits are fast because clips are cached in `backend/shimaclips.db`, which is gitignored.
+Exact per-day counts need a full crawl, and Twitch only returns about 1,000 clips per query, so the first load of a very popular streamer can take a long time (the app splits busy periods into days and hours). Everything is cached in `backend/shimaclips.db` (gitignored), so later visits are fast and only recent clips are refetched.
+
+## Watchlist
+A short list of streamers is kept preloaded in the background while the app is running. It lives in the local database (not in the repo) and is seeded once with a starting list. The crawler only runs while the backend is running, always yields to a streamer you open yourself, and resumes where it left off. The list is managed through the `/api/watchlist` endpoints.
 
 ## Setup
 1. Create a free app at https://dev.twitch.tv/console (OAuth redirect `http://localhost`, category Other) and copy the client ID and secret.
@@ -21,8 +24,10 @@ The first load of a very popular streamer can take a few minutes. Later visits a
 One command: `./run.sh`, then open http://localhost:3000. Ctrl+C stops both servers.
 
 Or in two terminals:
-- Backend: `cd backend && .venv/bin/uvicorn main:app --reload`
+- Backend: `cd backend && .venv/bin/uvicorn main:app --reload --timeout-graceful-shutdown 3`
 - Frontend: `cd frontend && npm run dev`
+
+Set `SHIMACLIPS_CRAWLER=0` to start the backend without the background watchlist crawler.
 
 ## Tests
 - Backend: `cd backend && .venv/bin/pytest`
