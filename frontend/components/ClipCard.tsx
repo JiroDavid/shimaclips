@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { usePreviewController } from "@/components/ClipPreview";
 import type { Clip } from "@/lib/api";
 
 function formatDuration(s: number): string {
@@ -16,8 +20,39 @@ export default function ClipCard({
   checked: boolean;
   onToggle: () => void;
 }) {
+  const controller = usePreviewController();
+  const entered = useRef(false);
+
+  useEffect(
+    () => () => {
+      if (entered.current) controller?.leave();
+    },
+    [controller],
+  );
+
+  function enter(el: HTMLElement) {
+    if (!controller) return;
+    entered.current = true;
+    const r = el.getBoundingClientRect();
+    controller.enter(clip.id, { left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+  }
+
+  function leave() {
+    if (!entered.current) return;
+    entered.current = false;
+    controller?.leave();
+  }
+
   return (
     <label
+      onPointerEnter={(e) => {
+        if (e.pointerType !== "touch") enter(e.currentTarget);
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType !== "touch") leave();
+      }}
+      onFocus={(e) => enter(e.currentTarget)}
+      onBlur={leave}
       className={`block cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 transition ${
         checked ? "border-purple-500" : "border-zinc-800"
       }`}
