@@ -9,6 +9,7 @@ import {
   type WatchEntry,
 } from "@/lib/api";
 import { createLatest } from "@/lib/latest";
+import { combineErrors } from "@/lib/watchlist";
 
 const POLL_MS = 5000;
 const NO_PENDING: ReadonlySet<string> = new Set();
@@ -24,6 +25,7 @@ export function useWatchlist(): {
 } {
   const [entries, setEntries] = useState<WatchEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [now, setNow] = useState(0);
   const [pending, setPending] = useState<ReadonlySet<string>>(NO_PENDING);
   const latest = useRef(createLatest());
@@ -77,11 +79,11 @@ export function useWatchlist(): {
       if (pendingRef.current.has(key)) return;
       pendingRef.current.add(key);
       setPending(new Set(pendingRef.current));
+      setActionError(null);
       try {
         await fn();
-        setError(null);
       } catch (e) {
-        if (mounted.current) setError(e instanceof Error ? e.message : "Watchlist update failed");
+        if (mounted.current) setActionError(e instanceof Error ? e.message : "Watchlist update failed");
       }
       await refetch();
       pendingRef.current.delete(key);
@@ -100,5 +102,5 @@ export function useWatchlist(): {
     [act],
   );
 
-  return { entries, error, now, pending, add, remove, setPaused };
+  return { entries, error: combineErrors(actionError, error), now, pending, add, remove, setPaused };
 }

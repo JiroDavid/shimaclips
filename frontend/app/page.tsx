@@ -179,6 +179,9 @@ export default function Home() {
                 />
                 Keep this streamer up to date
               </label>
+              {watchlist.error && (
+                <span className="text-xs text-red-400">{watchlist.error}</span>
+              )}
               <button
                 onClick={() => refresh(false)}
                 disabled={busy}

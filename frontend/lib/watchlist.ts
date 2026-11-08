@@ -26,12 +26,8 @@ export function isWatched(entries: WatchEntry[], login: string | null): boolean 
   return entries.some((e) => e.login.toLowerCase() === l);
 }
 
-export function mergeEntry(entries: WatchEntry[], next: WatchEntry): WatchEntry[] {
-  const i = entries.findIndex((e) => e.login === next.login);
-  if (i < 0) return [...entries, next];
-  const copy = entries.slice();
-  copy[i] = next;
-  return copy;
+export function combineErrors(action: string | null, poll: string | null): string | null {
+  return action ?? poll;
 }
 
 export function lastRefreshedLabel(iso: string | null, now: number): string {

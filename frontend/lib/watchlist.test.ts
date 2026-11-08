@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { WatchEntry } from "@/lib/api";
-import { isWatched, lastRefreshedLabel, mergeEntry, progressFraction, stateLabel } from "@/lib/watchlist";
+import { combineErrors, isWatched, lastRefreshedLabel, progressFraction, stateLabel } from "@/lib/watchlist";
 
 const e = (o: Partial<WatchEntry> = {}): WatchEntry => ({
   login: "arky",
@@ -36,12 +36,10 @@ describe("watchlist helpers", () => {
     expect(isWatched([e()], null)).toBe(false);
   });
 
-  it("merges entries by login", () => {
-    const a = e();
-    const b = e({ login: "ludwig" });
-    expect(mergeEntry([a], b)).toEqual([a, b]);
-    const a2 = e({ state: "paused" });
-    expect(mergeEntry([a, b], a2)).toEqual([a2, b]);
+  it("prefers the action error over the poll error", () => {
+    expect(combineErrors("a", "p")).toBe("a");
+    expect(combineErrors(null, "p")).toBe("p");
+    expect(combineErrors(null, null)).toBeNull();
   });
 
   it("formats last refreshed", () => {
