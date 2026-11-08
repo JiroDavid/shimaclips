@@ -8,6 +8,7 @@ const NONE: YearInfo[] = [];
 const NO_PENDING: ReadonlySet<number> = new Set();
 
 type Settled = { login: string; years: YearInfo[]; error: string | null };
+type ToggleError = { login: string; error: string };
 type Pending = { login: string; years: ReadonlySet<number> };
 
 export function useYears(
@@ -22,6 +23,7 @@ export function useYears(
 } {
   const [settled, setSettled] = useState<Settled>({ login: "", years: NONE, error: null });
   const [pendingState, setPendingState] = useState<Pending>({ login: "", years: NO_PENDING });
+  const [toggleError, setToggleError] = useState<ToggleError | null>(null);
   const [reloads, setReloads] = useState(0);
   const latest = useRef(createLatest());
   const pendingRef = useRef(new Set<string>());
@@ -68,20 +70,25 @@ export function useYears(
       const key = `${login}|${year}`;
       if (pendingRef.current.has(key)) return;
       pendingRef.current.add(key);
+      setToggleError(null);
       syncPending(login);
       (async () => {
         let error: string | null = null;
         try {
           await setYearExact(login, year, enabled);
-          const res = await latest.current.run((signal) => getYears(login, signal));
-          if (res.ok && mounted.current) setSettled({ login, years: res.value, error: null });
         } catch (e) {
           error = e instanceof Error ? e.message : "Could not update the year";
+        }
+        if (!error) {
+          try {
+            const res = await latest.current.run((signal) => getYears(login, signal));
+            if (res.ok && mounted.current) setSettled({ login, years: res.value, error: null });
+          } catch {}
         }
         pendingRef.current.delete(key);
         if (!mounted.current) return;
         syncPending(login);
-        if (error) setSettled((prev) => ({ login, years: prev.login === login ? prev.years : NONE, error }));
+        if (error) setToggleError({ login, error });
         setReloads((n) => n + 1);
       })();
     },
@@ -93,7 +100,7 @@ export function useYears(
   const mine = login !== null && settled.login === login;
   return {
     years: mine ? settled.years : NONE,
-    error: mine ? settled.error : null,
+    error: toggleError?.login === login ? toggleError.error : mine ? settled.error : null,
     pending: login !== null && pendingState.login === login ? pendingState.years : NO_PENDING,
     toggle,
     reload,

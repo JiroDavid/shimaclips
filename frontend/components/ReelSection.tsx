@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ClipReel from "@/components/ClipReel";
 import type { Clip } from "@/lib/api";
 import { rangeOfKey } from "@/lib/calendar";
 import type { Selection } from "@/lib/selection";
+import { shouldFallBackToViews, type Sort } from "@/lib/sort";
 import { useClips } from "@/lib/useClips";
 
-type Sort = "views" | "newest";
 type Range = { start?: string; end?: string };
 
 type Common = {
@@ -35,6 +35,10 @@ function ReelBody({
   yearFilter?: { value: number | null; years: number[]; onChange: (year: number | null) => void };
 }) {
   const { clips, total, exact, loading, error, showMore, hasMore } = useClips(login, range, tick, sort);
+  const fallBack = shouldFallBackToViews(sort, loading, exact);
+  useEffect(() => {
+    if (fallBack) onSortChange("views");
+  }, [fallBack, onSortChange]);
   return (
     <ClipReel
       {...rest}
@@ -66,6 +70,10 @@ export default function ReelSection({
 }) {
   const [sort, setSort] = useState<Sort>("views");
   const [year, setYear] = useState<number | null>(null);
+  const changeYear = (next: number | null) => {
+    setSort("views");
+    setYear(next);
+  };
   const effectiveRange: Range = year !== null ? rangeOfKey(String(year)) : range;
   return (
     <ReelBody
@@ -76,7 +84,7 @@ export default function ReelSection({
       tick={tick}
       sort={sort}
       onSortChange={setSort}
-      yearFilter={yearOptions ? { value: year, years: yearOptions, onChange: setYear } : undefined}
+      yearFilter={yearOptions ? { value: year, years: yearOptions, onChange: changeYear } : undefined}
     />
   );
 }

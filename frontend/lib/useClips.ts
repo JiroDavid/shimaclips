@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { getClips, type Clip } from "@/lib/api";
 import { createLatest } from "@/lib/latest";
+import type { Sort } from "@/lib/sort";
 import { appendUnique, nextPage } from "@/lib/paging";
 
 const PAGE = 10;
 const NONE: Clip[] = [];
 
-type Sort = "views" | "newest";
 type Settled = { id: string; clips: Clip[]; total: number; exact: boolean; hasMore: boolean; error: string | null };
 
 async function fetchTop(
