@@ -16,7 +16,7 @@ import { useStreamer } from "@/lib/useStreamer";
 import { useYears } from "@/lib/useYears";
 
 export default function Home() {
-  const { streamer, state, phase, error, tick, startedAt, open, refresh } = useStreamer();
+  const { streamer, state, phase, error, tick, startedAt, open, refresh, reattach } = useStreamer();
   const [lastLogin, setLastLogin] = useState("");
   const [owner, setOwner] = useState<string | null>(null);
   const [selection, setSelection] = useState<{ login: string; key: string } | null>(null);
@@ -37,10 +37,10 @@ export default function Home() {
   const yearOptions = yearsState.years.map((y) => y.year);
 
   function onYearToggle(year: number, enabled: boolean) {
-    yearsState.toggle(year, enabled);
-    // Task 11 re-attaches the load-progress stream here
+    yearsState.toggle(year, enabled, reattach);
   }
 
+  const olderApproximate = yearsState.years.some((y) => y.state === "approximate");
   const busy = phase === "opening" || phase === "loading";
 
   function reelList() {
@@ -83,8 +83,14 @@ export default function Home() {
 
       <StreamerSearch onSelect={submit} />
 
-      {(busy || phase === "error") && (
-        <LoadingBanner state={state} startedAt={startedAt} error={phase === "error" ? error : null} onRetry={retry} />
+      {(busy || phase === "error" || (phase === "ready" && olderApproximate)) && (
+        <LoadingBanner
+          state={state}
+          startedAt={startedAt}
+          error={phase === "error" ? error : null}
+          onRetry={retry}
+          olderApproximate={olderApproximate}
+        />
       )}
 
       {streamer && (

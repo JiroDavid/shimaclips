@@ -11,11 +11,13 @@ export default function LoadingBanner({
   startedAt,
   error,
   onRetry,
+  olderApproximate = false,
 }: {
   state: LoadState | null;
   startedAt: number | null;
   error: string | null;
   onRetry: () => void;
+  olderApproximate?: boolean;
 }) {
   const [mountedAt] = useState(() => Date.now());
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -32,7 +34,12 @@ export default function LoadingBanner({
 
   return (
     <div className="space-y-3">
-      {!error && (
+      {!error && state?.status === "done" && olderApproximate && (
+        <p className="text-xs text-zinc-400">
+          Older years are approximate - switch a year on to load it exactly
+        </p>
+      )}
+      {!error && state?.status !== "done" && (
         <div className={`space-y-2 rounded-lg border bg-zinc-900 p-4 ${slow ? "border-amber-600" : "border-zinc-800"}`}>
           <p className={`text-sm ${slow ? "text-amber-300" : "text-zinc-300"}`}>{text}</p>
           <div className="h-2 overflow-hidden rounded bg-zinc-800">

@@ -18,7 +18,7 @@ export function useYears(
   years: YearInfo[];
   error: string | null;
   pending: ReadonlySet<number>;
-  toggle(year: number, enabled: boolean): void;
+  toggle(year: number, enabled: boolean, onApplied?: () => void): void;
   reload(): void;
 } {
   const [settled, setSettled] = useState<Settled>({ login: "", years: NONE, error: null });
@@ -65,7 +65,7 @@ export function useYears(
   }, []);
 
   const toggle = useCallback(
-    (year: number, enabled: boolean) => {
+    (year: number, enabled: boolean, onApplied?: () => void) => {
       if (!login) return;
       const key = `${login}|${year}`;
       if (pendingRef.current.has(key)) return;
@@ -80,6 +80,7 @@ export function useYears(
           error = e instanceof Error ? e.message : "Could not update the year";
         }
         if (!error) {
+          if (mounted.current) onApplied?.();
           try {
             const res = await latest.current.run((signal) => getYears(login, signal));
             if (res.ok && mounted.current) setSettled({ login, years: res.value, error: null });

@@ -23,6 +23,7 @@ export function useStreamer() {
   const lastTickAt = useRef(0);
   const lastClips = useRef(-1);
   const lastDone = useRef(-1);
+  const lastTotal = useRef(-1);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setPhase = useCallback((p: Phase) => {
@@ -52,9 +53,15 @@ export function useStreamer() {
       setState(s);
       if (s.status === "queued" || s.status === "running") {
         setPhase("loading");
-        if (s.clips === lastClips.current && s.windows_done === lastDone.current) return;
+        if (
+          s.clips === lastClips.current &&
+          s.windows_done === lastDone.current &&
+          s.windows_total === lastTotal.current
+        )
+          return;
         lastClips.current = s.clips;
         lastDone.current = s.windows_done;
+        lastTotal.current = s.windows_total;
         const wait = lastTickAt.current + TICK_INTERVAL_MS - Date.now();
         if (wait <= 0) bump();
         else if (!timer.current) {
@@ -66,6 +73,7 @@ export function useStreamer() {
       }
       lastClips.current = s.clips;
       lastDone.current = s.windows_done;
+      lastTotal.current = s.windows_total;
       if (s.status === "done") {
         setError(null);
         setPhase("ready");
@@ -85,6 +93,7 @@ export function useStreamer() {
       loginRef.current = login;
       lastClips.current = -1;
       lastDone.current = -1;
+      lastTotal.current = -1;
       lastTickAt.current = 0;
       if (!keepStreamer) setStreamer(null);
       setState(null);
@@ -138,6 +147,28 @@ export function useStreamer() {
     [run],
   );
 
+  const reattach = useCallback(() => {
+    const login = loginRef.current;
+    if (!login || phaseRef.current === "opening") return;
+    const id = openId.current;
+    stop();
+    lastClips.current = -1;
+    lastDone.current = -1;
+    lastTotal.current = -1;
+    closeStream.current = watchStreamer(
+      login,
+      (next) => {
+        if (id === openId.current) apply(id, next);
+      },
+      () => {
+        if (id !== openId.current) return;
+        stop();
+        setError("Lost connection to the loader");
+        setPhase("error");
+      },
+    );
+  }, [apply, setPhase, stop]);
+
   const dispose = useCallback(() => {
     openId.current++;
     stop();
@@ -154,5 +185,6 @@ export function useStreamer() {
     startedAt: state ? state.started_at * 1000 : null,
     open,
     refresh,
+    reattach,
   };
 }
