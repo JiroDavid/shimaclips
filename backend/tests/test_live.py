@@ -139,3 +139,71 @@ def test_twitch_error_propagates_and_is_not_memoized(store):
     fake.error = None
     live.ensure(*args)
     assert len(fake.calls) == 2
+
+
+def wait_for(cond, tries=300):
+    for _ in range(tries):
+        if cond():
+            return True
+        threading.Event().wait(0.01)
+    return False
+
+
+def seed(store, n):
+    store.upsert_clips("1", [mk(i) for i in range(n)])
+
+
+ARGS = (Streamer, date(2026, 1, 1), date(2026, 1, 31))
+
+
+def test_cached_first_returns_immediately_and_refreshes_in_background(store):
+    seed(store, 5)
+    gate = threading.Event()
+    fake = FakeTwitch([mk(100)], gate=gate)
+    live = live_for(store, fake)
+    assert live.ensure_cached_first(*ARGS, 5, TODAY, 5) is False
+    assert wait_for(lambda: fake.calls)
+    assert store.top_clips("1", None, None, 10, 0)[1] == 5
+    gate.set()
+    assert wait_for(lambda: store.top_clips("1", None, None, 10, 0)[1] == 6)
+
+
+def test_cached_first_does_not_duplicate_inflight_refresh(store):
+    seed(store, 5)
+    gate = threading.Event()
+    fake = FakeTwitch([mk(100)], gate=gate)
+    live = live_for(store, fake)
+    live.ensure_cached_first(*ARGS, 5, TODAY, 5)
+    assert wait_for(lambda: fake.calls)
+    live.ensure_cached_first(*ARGS, 5, TODAY, 5)
+    live.ensure_cached_first(*ARGS, 5, TODAY, 5)
+    gate.set()
+    assert wait_for(lambda: not live._inflight)
+    assert len(fake.calls) == 1
+
+
+def test_cached_first_swallows_background_errors(store):
+    seed(store, 5)
+    fake = FakeTwitch(error=TwitchError("boom"))
+    live = live_for(store, fake)
+    assert live.ensure_cached_first(*ARGS, 5, TODAY, 5) is False
+    assert wait_for(lambda: fake.calls and not live._inflight)
+
+
+def test_cached_first_blocks_when_cache_is_short(store):
+    seed(store, 2)
+    fake = FakeTwitch([mk(100)])
+    live = live_for(store, fake)
+    assert live.ensure_cached_first(*ARGS, 5, TODAY, 2) is False
+    assert len(fake.calls) == 1
+    assert store.top_clips("1", None, None, 10, 0)[1] == 3
+
+
+def test_cached_first_exact_range_unchanged(store):
+    store.add_windows("1", [(datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 2, 1, tzinfo=UTC))])
+    store.mark_done("1", datetime(2026, 1, 1, tzinfo=UTC), datetime(2026, 2, 1, tzinfo=UTC),
+                    datetime(2026, 3, 1, tzinfo=UTC), False)
+    seed(store, 5)
+    fake = FakeTwitch([mk(100)])
+    assert live_for(store, fake).ensure_cached_first(*ARGS, 5, TODAY, 5) is True
+    assert fake.calls == []

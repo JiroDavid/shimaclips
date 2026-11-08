@@ -346,7 +346,8 @@ def streamer_clips(login: str, start: date | None = None, end: date | None = Non
     if sort == "newest" and not store.range_exact(bid, start, end, streamer.account_created.date(), today):
         raise HTTPException(422, "Newest first needs a fully loaded period")
     try:
-        exact = live.ensure(streamer, start, end, offset + limit, today)
+        cached_total = store.top_clips(bid, start, end, 1, 0)[1]
+        exact = live.ensure_cached_first(streamer, start, end, offset + limit, today, cached_total)
     except TwitchError as e:
         if store.top_clips(bid, start, end, 1, 0)[1] == 0:
             raise HTTPException(502, str(e))

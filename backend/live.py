@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 from collections.abc import Callable
@@ -7,6 +8,8 @@ from store import Store, Streamer
 from twitch import TwitchClient
 
 MAX_LIVE = 1000
+
+log = logging.getLogger(__name__)
 
 
 def _midnight(d: date) -> datetime:
@@ -23,6 +26,7 @@ class LiveClips:
         self._memo: dict[tuple, tuple[int, float]] = {}
         self._locks: dict[tuple, threading.Lock] = {}
         self._master = threading.Lock()
+        self._inflight: set[tuple] = set()
 
     def _fresh(self, key: tuple, need: int) -> bool:
         entry = self._memo.get(key)
@@ -46,3 +50,27 @@ class LiveClips:
             self._store.upsert_clips(bid, clips)
             self._memo[key] = (need, self._clock())
         return False
+
+    def ensure_cached_first(self, streamer: Streamer, start: date | None, end: date | None,
+                            need: int, today: date, cached_total: int) -> bool:
+        if cached_total < need or self._store.range_exact(
+                streamer.broadcaster_id, start, end, streamer.account_created.date(), today):
+            return self.ensure(streamer, start, end, need, today)
+        key = (streamer.broadcaster_id, start, end)
+        with self._master:
+            if key in self._inflight:
+                return False
+            self._inflight.add(key)
+        threading.Thread(target=self._refresh, args=(key, streamer, start, end, need, today),
+                         daemon=True).start()
+        return False
+
+    def _refresh(self, key: tuple, streamer: Streamer, start: date | None, end: date | None,
+                 need: int, today: date) -> None:
+        try:
+            self.ensure(streamer, start, end, need, today)
+        except Exception as e:
+            log.warning("background live refresh failed: %s", type(e).__name__)
+        finally:
+            with self._master:
+                self._inflight.discard(key)

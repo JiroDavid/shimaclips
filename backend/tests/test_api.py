@@ -590,3 +590,25 @@ def test_clips_offline_real_client_serves_cached(api):
     c.store.upsert_clips("1", [clip(1, 50)])
     r = c.get(url)
     assert r.status_code == 200 and r.json()["exact"] is False
+
+
+def test_clips_non_exact_with_enough_cache_returns_before_live_fetch(api):
+    gate = threading.Event()
+    fake = FakeTwitch(top=[clip(99, 1)])
+    orig = fake.fetch_top
+
+    def slow(*a, **k):
+        gate.wait(5)
+        return orig(*a, **k)
+
+    fake.fetch_top = slow
+    c = api(fake)
+    c.store.upsert_streamer(User("1", "jason", "Jason", CREATED))
+    c.store.upsert_clips("1", [clip(1, 50), clip(2, 20)])
+    r = c.get("/api/streamers/jason/clips?start=2026-01-01&end=2026-01-31&limit=2")
+    body = r.json()
+    assert r.status_code == 200
+    assert body["exact"] is False
+    assert [x["view_count"] for x in body["clips"]] == [50, 20]
+    assert body["has_more"] is True
+    gate.set()
