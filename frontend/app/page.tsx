@@ -3,13 +3,11 @@
 import { useEffect, useState } from "react";
 import ClipPreview, { PreviewContext } from "@/components/ClipPreview";
 import { createPreviewController } from "@/lib/previewController";
-import { hasOlderApproximate } from "@/lib/years";
 import CalendarView from "@/components/CalendarView";
 import DownloadPanel from "@/components/DownloadPanel";
 import LoadingBanner from "@/components/LoadingBanner";
 import ReelSection from "@/components/ReelSection";
 import WatchlistPanel from "@/components/WatchlistPanel";
-import YearChips from "@/components/YearChips";
 import SelectionPanel from "@/components/SelectionPanel";
 import StreamerSearch from "@/components/StreamerSearch";
 import { labelOfKey, rangeOfKey, todayUtc } from "@/lib/calendar";
@@ -37,7 +35,6 @@ export default function Home() {
     startedAt,
     open,
     refresh,
-    reattach,
   } = useStreamer();
   const [preview] = useState(() => createPreviewController({}));
   useEffect(() => () => preview.close(), [preview]);
@@ -73,11 +70,6 @@ export default function Home() {
   const watchBusy = shownLogin ? watchlist.pending.has(shownLogin.toLowerCase()) : false;
   const yearOptions = yearsState.years.map((y) => y.year);
 
-  function onYearToggle(year: number, enabled: boolean) {
-    yearsState.toggle(year, enabled, enabled ? reattach : undefined);
-  }
-
-  const olderApproximate = hasOlderApproximate(yearsState.years);
   const busy = phase === "opening" || phase === "loading";
 
   function reelList() {
@@ -144,15 +136,12 @@ export default function Home() {
           onSetPaused={watchlist.setPaused}
         />
 
-        {(busy ||
-          phase === "error" ||
-          (phase === "ready" && olderApproximate)) && (
+        {(busy || phase === "error") && (
           <LoadingBanner
             state={state}
             startedAt={startedAt}
             error={phase === "error" ? error : null}
             onRetry={retry}
-            olderApproximate={olderApproximate}
           />
         )}
 
@@ -201,13 +190,6 @@ export default function Home() {
 
         {streamer && (
           <>
-            <YearChips
-              key={`${streamer.login}|years`}
-              years={yearsState.years}
-              pending={yearsState.pending}
-              error={yearsState.error}
-              onToggle={onYearToggle}
-            />
             <CalendarView
               key={`${streamer.login}|calendar`}
               login={streamer.login}

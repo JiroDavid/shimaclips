@@ -5,7 +5,7 @@ Browse a streamer's Twitch clips on a calendar and download the best ones.
 ## How it works
 1. Search for a streamer. Matches appear with their profile pictures so you can pick the right channel.
 2. A heatmap shows clip density by year, month and week. Cells that are still loading show an approximate count like `1,000+` and are already clickable once some of their clips are loaded.
-3. Year chips above the calendar choose which years to load. Toggling a year loads it in the background; older years show approximate cells first.
+3. Older years show approximate cells; the current and previous year load exactly.
 4. Click a month or a day to see its top clips.
 5. Reels show the top clips for this month, this year and most viewed of all time. They are fetched live from Twitch, so they appear within seconds even for very popular streamers. The all-time reel can be filtered by year, and reels can be sorted by most viewed or newest (newest needs an exactly loaded period).
 6. Hover a clip card for about 400 ms (or focus it with the keyboard) to play a muted video preview from the Twitch clip embed. Sweeping the pointer across cards starts nothing.
