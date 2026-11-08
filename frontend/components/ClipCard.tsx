@@ -51,7 +51,9 @@ export default function ClipCard({
       onPointerLeave={(e) => {
         if (e.pointerType !== "touch") leave();
       }}
-      onFocus={(e) => enter(e.currentTarget)}
+      onFocus={(e) => {
+        if (e.target.matches(":focus-visible")) enter(e.currentTarget);
+      }}
       onBlur={leave}
       className={`block cursor-pointer overflow-hidden rounded-lg border bg-zinc-900 transition ${
         checked ? "border-purple-500" : "border-zinc-800"

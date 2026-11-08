@@ -24,6 +24,7 @@ export function createPreviewController(opts: {
   let current: PreviewState = null;
   let openTimer: ReturnType<typeof setTimeout> | null = null;
   let closeTimer: ReturnType<typeof setTimeout> | null = null;
+  let overPopup = false;
 
   function cancelOpen() {
     if (openTimer !== null) clear(openTimer);
@@ -42,6 +43,7 @@ export function createPreviewController(opts: {
     if (!current) return;
     closeTimer = set(() => {
       closeTimer = null;
+      overPopup = false;
       publish(null);
     }, graceMs);
   }
@@ -58,16 +60,20 @@ export function createPreviewController(opts: {
       }, delayMs);
     },
     leave() {
+      if (overPopup) return;
       cancelOpen();
       scheduleClose();
     },
     popupEnter() {
+      overPopup = true;
       cancelClose();
     },
     popupLeave() {
+      overPopup = false;
       scheduleClose();
     },
     close() {
+      overPopup = false;
       cancelOpen();
       cancelClose();
       if (current) publish(null);

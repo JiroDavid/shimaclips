@@ -65,6 +65,32 @@ describe("previewController", () => {
     expect(seen).toEqual(["a", null]);
   });
 
+  it("leave is ignored while the pointer is over the popup", () => {
+    const { c, seen } = setup();
+    c.enter("a", rect);
+    vi.advanceTimersByTime(400);
+    c.popupEnter();
+    c.leave();
+    vi.advanceTimersByTime(1000);
+    expect(seen).toEqual(["a"]);
+    c.popupLeave();
+    vi.advanceTimersByTime(150);
+    expect(seen).toEqual(["a", null]);
+  });
+
+  it("close resets the popup hover flag", () => {
+    const { c, seen } = setup();
+    c.enter("a", rect);
+    vi.advanceTimersByTime(400);
+    c.popupEnter();
+    c.close();
+    c.enter("b", rect);
+    vi.advanceTimersByTime(400);
+    c.leave();
+    vi.advanceTimersByTime(150);
+    expect(seen).toEqual(["a", null, "b", null]);
+  });
+
   it("only one preview at a time", () => {
     const { c, seen } = setup();
     c.enter("a", rect);
