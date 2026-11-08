@@ -112,11 +112,14 @@ class TwitchClient:
             self._fetch_token_locked()
 
     def _fetch_token_locked(self) -> None:
-        r = self._http.post(TOKEN_URL, params={
-            "client_id": self._client_id,
-            "client_secret": self._client_secret,
-            "grant_type": "client_credentials",
-        })
+        try:
+            r = self._http.post(TOKEN_URL, params={
+                "client_id": self._client_id,
+                "client_secret": self._client_secret,
+                "grant_type": "client_credentials",
+            })
+        except httpx.HTTPError as e:
+            raise TwitchError("Could not reach Twitch") from e
         if r.status_code != 200:
             raise TwitchError(f"Twitch auth failed ({r.status_code}). Check your client ID and secret in backend/.env")
         data = r.json()
@@ -144,10 +147,13 @@ class TwitchClient:
         while True:
             self._pace()
             token = self._token
-            r = self._http.get(f"{API_URL}{path}", params=params, headers={
-                "Client-Id": self._client_id,
-                "Authorization": f"Bearer {token}",
-            })
+            try:
+                r = self._http.get(f"{API_URL}{path}", params=params, headers={
+                    "Client-Id": self._client_id,
+                    "Authorization": f"Bearer {token}",
+                })
+            except httpx.HTTPError as e:
+                raise TwitchError("Could not reach Twitch") from e
             if r.status_code == 401 and not refreshed:
                 refreshed = True
                 self._fetch_token(stale=token)

@@ -110,7 +110,7 @@ def test_reset_nonfinal_keeps_old_done_windows(tmp_path):
     s.mark_done("1", *new, dt(2026, 3, 2), True)
     s.reset_windows("1", "nonfinal", dt(2026, 5, 2), timedelta(days=2))
     w = s.next_pending("1")
-    assert (w.start, w.end) == new and w.truncated is False and w.fetched_at is None
+    assert (w.start, w.end) == new and w.truncated is True and w.fetched_at is None
     assert s.progress("1").windows_done == 1
 
 
@@ -527,3 +527,16 @@ def test_bucket_has_no_ready_field(tmp_path):
     b = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 1), "month")[0]
     assert not hasattr(b, "ready")
     assert b.state in ("exact", "approximate", "empty")
+
+
+def test_reset_keeps_capped_hours_approximate_until_refetched(tmp_path):
+    s = make(tmp_path)
+    w = (dt(2026, 1, 1), dt(2026, 1, 2))
+    s.add_windows("1", [w])
+    s.mark_done("1", *w, dt(2026, 1, 3), True)
+    s.reset_windows("1", "all", dt(2026, 1, 4), timedelta(days=2))
+    cells = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 31), "day")
+    assert cells[0].state != "exact"
+    s.mark_done("1", *w, dt(2026, 1, 5), False)
+    cells = s.bucket_counts("1", date(2026, 1, 1), date(2026, 1, 31), "day")
+    assert cells[0].state == "exact"

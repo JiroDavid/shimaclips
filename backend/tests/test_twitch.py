@@ -297,3 +297,22 @@ def test_fetch_top_never_exceeds_page_limit():
     clips = make_client(handler).fetch_top("42", START, END, 5000)
     assert len(requests) == 10
     assert len(clips) == 1000
+
+
+@pytest.mark.parametrize("exc", [httpx.ConnectError("down"), httpx.ReadTimeout("slow")])
+def test_network_errors_become_twitch_error_on_api_call(exc):
+    def handler(request):
+        if request.url.host == "id.twitch.tv":
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
+        raise exc
+
+    with pytest.raises(TwitchError):
+        make_client(handler).get_user("a")
+
+
+def test_network_error_becomes_twitch_error_on_token_fetch():
+    def handler(request):
+        raise httpx.ConnectError("down")
+
+    with pytest.raises(TwitchError):
+        make_client(handler).get_user("a")

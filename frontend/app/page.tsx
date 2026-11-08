@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import ClipPreview, { PreviewContext } from "@/components/ClipPreview";
 import { createPreviewController } from "@/lib/previewController";
+import { hasOlderApproximate } from "@/lib/years";
 import CalendarView from "@/components/CalendarView";
 import DownloadPanel from "@/components/DownloadPanel";
 import LoadingBanner from "@/components/LoadingBanner";
@@ -73,12 +74,10 @@ export default function Home() {
   const yearOptions = yearsState.years.map((y) => y.year);
 
   function onYearToggle(year: number, enabled: boolean) {
-    yearsState.toggle(year, enabled, reattach);
+    yearsState.toggle(year, enabled, enabled ? reattach : undefined);
   }
 
-  const olderApproximate = yearsState.years.some(
-    (y) => y.state === "approximate",
-  );
+  const olderApproximate = hasOlderApproximate(yearsState.years);
   const busy = phase === "opening" || phase === "loading";
 
   function reelList() {

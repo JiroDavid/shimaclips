@@ -301,7 +301,7 @@ class Store:
                     elif r["fetched_at"] is None or _dec(r["fetched_at"]) < _dec(r["end"]) + grace:
                         targets.append((broadcaster_id, r["start"], r["end"]))
                 conn.executemany(
-                    "UPDATE windows SET status='pending', fetched_at=NULL, truncated=0 "
+                    "UPDATE windows SET status='pending', fetched_at=NULL "
                     'WHERE broadcaster_id=? AND start=? AND "end"=?',
                     targets,
                 )
@@ -330,7 +330,7 @@ class Store:
     @staticmethod
     def _leaves(conn: sqlite3.Connection, broadcaster_id: str) -> list[sqlite3.Row]:
         return conn.execute(
-            'SELECT start, "end", has_data, (status = \'done\' AND truncated = 1) AS capped '
+            'SELECT start, "end", has_data, truncated AS capped '
             "FROM windows WHERE broadcaster_id = ? AND status != 'split'",
             (broadcaster_id,),
         ).fetchall()

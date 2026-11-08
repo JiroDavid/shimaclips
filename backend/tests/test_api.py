@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -11,7 +12,7 @@ import main
 from live import LiveClips
 from loader import LoadManager
 from store import Store
-from twitch import ChannelHit, Clip, ClipsResult, TwitchError, User
+from twitch import ChannelHit, Clip, ClipsResult, TwitchClient, TwitchError, User
 
 
 CREATED = datetime(2020, 1, 1, tzinfo=timezone.utc)
@@ -574,3 +575,18 @@ def test_get_twitch_missing_credentials_still_raises(monkeypatch):
     with pytest.raises(main.HTTPException) as e:
         main.get_twitch()
     assert e.value.status_code == 500
+
+
+def test_clips_offline_real_client_serves_cached(api):
+    def handler(request):
+        raise httpx.ConnectError("down")
+
+    real = TwitchClient("id", "secret", http=httpx.Client(transport=httpx.MockTransport(handler)))
+    c = api(FakeTwitch())
+    c.store.upsert_streamer(User("1", "jason", "Jason", CREATED))
+    main.app.dependency_overrides[main.get_live] = lambda: LiveClips(c.store, lambda: real)
+    url = "/api/streamers/jason/clips?start=2026-01-01&end=2026-01-31"
+    assert c.get(url).status_code == 502
+    c.store.upsert_clips("1", [clip(1, 50)])
+    r = c.get(url)
+    assert r.status_code == 200 and r.json()["exact"] is False

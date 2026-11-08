@@ -66,7 +66,7 @@ export default function ClipCard({
         <span className="absolute bottom-2 right-2 rounded bg-black/70 px-2 py-0.5 text-xs">
           {formatDuration(clip.duration)}
         </span>
-        <input type="checkbox" checked={checked} onChange={onToggle} className="absolute right-2 top-2 h-5 w-5 accent-purple-500" />
+        <input type="checkbox" checked={checked} onChange={onToggle} onPointerDown={() => controller?.close()} className="absolute right-2 top-2 h-5 w-5 accent-purple-500" />
       </div>
       <div className="space-y-1 p-3">
         <p className="line-clamp-2 text-sm font-medium">{clip.title}</p>
