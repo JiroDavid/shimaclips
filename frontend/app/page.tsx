@@ -7,6 +7,7 @@ import CalendarView from "@/components/CalendarView";
 import DownloadPanel from "@/components/DownloadPanel";
 import LoadingBanner from "@/components/LoadingBanner";
 import ReelSection from "@/components/ReelSection";
+import WatchlistPanel from "@/components/WatchlistPanel";
 import YearChips from "@/components/YearChips";
 import SelectionPanel from "@/components/SelectionPanel";
 import StreamerSearch from "@/components/StreamerSearch";
@@ -21,7 +22,9 @@ import {
 import type { Clip } from "@/lib/api";
 import { useDownload } from "@/lib/useDownload";
 import { useStreamer } from "@/lib/useStreamer";
+import { useWatchlist } from "@/lib/useWatchlist";
 import { useYears } from "@/lib/useYears";
+import { isWatched } from "@/lib/watchlist";
 
 export default function Home() {
   const {
@@ -64,6 +67,9 @@ export default function Home() {
 
   const download = useDownload(owner);
   const yearsState = useYears(shownLogin, tick);
+  const watchlist = useWatchlist();
+  const watched = isWatched(watchlist.entries, shownLogin);
+  const watchBusy = shownLogin ? watchlist.pending.has(shownLogin.toLowerCase()) : false;
   const yearOptions = yearsState.years.map((y) => y.year);
 
   function onYearToggle(year: number, enabled: boolean) {
@@ -129,6 +135,16 @@ export default function Home() {
 
         <StreamerSearch onSelect={submit} />
 
+        <WatchlistPanel
+          entries={watchlist.entries}
+          error={watchlist.error}
+          now={watchlist.now}
+          pending={watchlist.pending}
+          onOpen={submit}
+          onRemove={watchlist.remove}
+          onSetPaused={watchlist.setPaused}
+        />
+
         {(busy ||
           phase === "error" ||
           (phase === "ready" && olderApproximate)) && (
@@ -149,7 +165,20 @@ export default function Home() {
                 account created {streamer.account_created.slice(0, 10)}
               </span>
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={watched}
+                  disabled={watchBusy}
+                  onChange={() =>
+                    watched
+                      ? watchlist.remove(streamer.login)
+                      : void watchlist.add(streamer.login)
+                  }
+                />
+                Keep this streamer up to date
+              </label>
               <button
                 onClick={() => refresh(false)}
                 disabled={busy}

@@ -191,3 +191,46 @@ export async function searchStreamers(q: string, signal?: AbortSignal): Promise<
   const body = await r.json();
   return body.results;
 }
+
+export type WatchState = "waiting" | "loading" | "up_to_date" | "paused" | "error";
+
+export type WatchEntry = {
+  login: string;
+  display_name: string;
+  paused: boolean;
+  last_refreshed: string | null;
+  state: WatchState;
+  windows_done: number;
+  windows_total: number;
+};
+
+export async function getWatchlist(signal?: AbortSignal): Promise<WatchEntry[]> {
+  const r = await fetch(`${API}/api/watchlist`, { signal });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return (await r.json()).entries;
+}
+
+export async function addWatch(login: string): Promise<WatchEntry> {
+  const r = await fetch(`${API}/api/watchlist`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ login }),
+  });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return r.json();
+}
+
+export async function removeWatch(login: string): Promise<void> {
+  const r = await fetch(`${API}/api/watchlist/${encodeURIComponent(login)}`, { method: "DELETE" });
+  if (!r.ok && r.status !== 404) throw new Error(await errorMessage(r));
+}
+
+export async function setWatchPaused(login: string, paused: boolean): Promise<WatchEntry> {
+  const r = await fetch(`${API}/api/watchlist/${encodeURIComponent(login)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paused }),
+  });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return r.json();
+}
