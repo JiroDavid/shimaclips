@@ -202,14 +202,14 @@ export default function Home() {
         {streamer && (
           <>
             <YearChips
-              key={streamer.login}
+              key={`${streamer.login}|years`}
               years={yearsState.years}
               pending={yearsState.pending}
               error={yearsState.error}
               onToggle={onYearToggle}
             />
             <CalendarView
-              key={streamer.login}
+              key={`${streamer.login}|calendar`}
               login={streamer.login}
               tick={tick}
               accountCreated={streamer.account_created}
