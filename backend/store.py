@@ -1,3 +1,6 @@
+import threading
+import time
+from bisect import bisect_left, bisect_right
 import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
@@ -8,6 +11,7 @@ from twitch import Clip, User
 
 _FMT = "%Y-%m-%dT%H:%M:%SZ"
 SCHEMA_VERSION = 4
+LEAF_CACHE_TTL = 10.0
 SEED_WATCHLIST = ["stableronaldo", "jasontheween", "arky", "marlon", "yugi", "ludwig"]
 
 
@@ -134,6 +138,9 @@ def _in_scope(allowed_years: set[int] | None) -> tuple[str, list]:
 class Store:
     def __init__(self, path: Path):
         self.path = Path(path)
+        self._leaf_lock = threading.Lock()
+        self._leaf_gen = 0
+        self._leaf_cache: dict[str, tuple[int, float, _LeafIndex]] = {}
         with closing(self._connect()) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             existing = conn.execute(
@@ -207,6 +214,7 @@ class Store:
             'INSERT OR IGNORE INTO windows (broadcaster_id, start, "end") VALUES (?, ?, ?)',
             [(broadcaster_id, _enc(s), _enc(e)) for s, e in windows],
         )
+        self._windows_changed()
 
     @staticmethod
     def _window(r: sqlite3.Row) -> Window:
@@ -261,6 +269,7 @@ class Store:
             'WHERE broadcaster_id=? AND start=? AND "end"=?',
             [(_enc(fetched_at), int(truncated), broadcaster_id, _enc(start), _enc(end))],
         )
+        self._windows_changed()
 
     def mark_split(self, broadcaster_id: str, start: datetime, end: datetime,
                    children: list[tuple[datetime, datetime]]) -> None:
@@ -275,6 +284,7 @@ class Store:
                     'INSERT OR IGNORE INTO windows (broadcaster_id, start, "end") VALUES (?, ?, ?)',
                     [(broadcaster_id, _enc(s), _enc(e)) for s, e in children],
                 )
+        self._windows_changed()
 
     def split_windows(self, broadcaster_id: str) -> list[tuple[datetime, datetime]]:
         with closing(self._connect()) as conn:
@@ -319,39 +329,50 @@ class Store:
                     (broadcaster_id, spans[0][1], spans[-1][2]),
                 )
             } if spans else {}
-            leaves = self._leaves(conn, broadcaster_id)
+            leaves = self._leaves(broadcaster_id)
         out = []
         for key, b_start, b_end in spans:
             count = counts.get(key, 0)
-            state = _cell_state(leaves, b_start, b_end, count)
+            state = leaves.state(b_start, b_end, count)
             out.append(Bucket(key, count, state))
         return out
 
-    @staticmethod
-    def _leaves(conn: sqlite3.Connection, broadcaster_id: str) -> list[sqlite3.Row]:
-        return conn.execute(
-            'SELECT start, "end", has_data, truncated AS capped '
-            "FROM windows WHERE broadcaster_id = ? AND status != 'split'",
-            (broadcaster_id,),
-        ).fetchall()
+    def _windows_changed(self) -> None:
+        with self._leaf_lock:
+            self._leaf_gen += 1
+
+    def _leaves(self, broadcaster_id: str) -> "_LeafIndex":
+        with self._leaf_lock:
+            hit = self._leaf_cache.get(broadcaster_id)
+            if hit and hit[0] == self._leaf_gen and time.monotonic() - hit[1] < LEAF_CACHE_TTL:
+                return hit[2]
+            gen = self._leaf_gen
+            with closing(self._connect()) as conn:
+                rows = conn.execute(
+                    'SELECT start, "end", has_data AND NOT truncated FROM windows '
+                    "WHERE broadcaster_id = ? AND status != 'split' ORDER BY start",
+                    (broadcaster_id,),
+                ).fetchall()
+            index = _LeafIndex(rows)
+            self._leaf_cache[broadcaster_id] = (gen, time.monotonic(), index)
+            return index
 
     def years_summary(self, broadcaster_id: str, first_year: int, last_year: int,
                       current_year: int) -> list[YearInfo]:
         enabled = self.exact_years(broadcaster_id, current_year)
         with closing(self._connect()) as conn:
-            leaves = self._leaves(conn, broadcaster_id)
+            leaves = self._leaves(broadcaster_id)
             clips = {
-                int(r["y"]): r["n"]
-                for r in conn.execute(
-                    "SELECT substr(created_at, 1, 4) AS y, COUNT(*) AS n FROM clips "
-                    "WHERE broadcaster_id = ? GROUP BY y",
-                    (broadcaster_id,),
-                )
+                year: conn.execute(
+                    "SELECT COUNT(*) FROM clips WHERE broadcaster_id = ? AND created_at >= ? AND created_at < ?",
+                    (broadcaster_id, f"{year:04d}-01-01T00:00:00Z", f"{year + 1:04d}-01-01T00:00:00Z"),
+                ).fetchone()[0]
+                for year in range(first_year, last_year + 1)
             }
         out = []
         for year in range(first_year, last_year + 1):
-            n = clips.get(year, 0)
-            state = _cell_state(leaves, f"{year:04d}-01-01T00:00:00Z", f"{year + 1:04d}-01-01T00:00:00Z", n)
+            n = clips[year]
+            state = leaves.state(f"{year:04d}-01-01T00:00:00Z", f"{year + 1:04d}-01-01T00:00:00Z", n)
             out.append(YearInfo(year, year in enabled, state, n))
         return out
 
@@ -361,8 +382,9 @@ class Store:
         hi = min(end or today, today)
         if hi < lo:
             return True
-        buckets = self.bucket_counts(broadcaster_id, lo, hi, "month")
-        return all(b.state == "exact" for b in buckets)
+        with closing(self._connect()) as conn:
+            leaves = self._leaves(broadcaster_id)
+        return all(leaves.exact(b_start, b_end) for _, b_start, b_end in _bucket_spans(lo, hi, "month"))
 
     def top_clips(self, broadcaster_id: str, start: date | None, end: date | None,
                   limit: int, offset: int, sort: str = "views") -> tuple[list[Clip], int]:
@@ -470,11 +492,32 @@ class Store:
         return Progress(w["done"], w["total"], clips, w["capped"])
 
 
-def _cell_state(leaves: list[sqlite3.Row], span_start: str, span_end: str, count: int) -> str:
-    overlapping = [w for w in leaves if w["start"] < span_end and w["end"] > span_start]
-    if overlapping and all(w["has_data"] and not w["capped"] for w in overlapping):
-        return "exact"
-    return "approximate" if count > 0 else "empty"
+class _LeafIndex:
+    def __init__(self, rows: list[tuple]):
+        self._starts = [r[0] for r in rows]
+        self._ends = [r[1] for r in rows]
+        self._ok = [bool(r[2]) for r in rows]
+        self._max_end: list[str] = []
+        top = ""
+        for e in self._ends:
+            top = max(top, e)
+            self._max_end.append(top)
+
+    def exact(self, span_start: str, span_end: str) -> bool:
+        lo = bisect_right(self._max_end, span_start)
+        hi = bisect_left(self._starts, span_end)
+        found = False
+        for i in range(lo, hi):
+            if self._ends[i] > span_start:
+                if not self._ok[i]:
+                    return False
+                found = True
+        return found
+
+    def state(self, span_start: str, span_end: str, count: int) -> str:
+        if self.exact(span_start, span_end):
+            return "exact"
+        return "approximate" if count > 0 else "empty"
 
 
 def _bucket_spans(start: date, end: date, granularity: str) -> list[tuple[str, str, str]]:
