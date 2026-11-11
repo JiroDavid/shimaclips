@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getYears, setYearExact, type YearInfo } from "@/lib/api";
 import { createLatest } from "@/lib/latest";
+import { useGatedTick } from "@/lib/useGatedTick";
 
 const NONE: YearInfo[] = [];
 const NO_PENDING: ReadonlySet<number> = new Set();
 
-type Settled = { login: string; years: YearInfo[]; error: string | null };
+type Settled = { login: string; gen: number; years: YearInfo[]; error: string | null };
 type ToggleError = { login: string; error: string };
 type Pending = { login: string; years: ReadonlySet<number> };
 
@@ -21,10 +22,11 @@ export function useYears(
   toggle(year: number, enabled: boolean, onApplied?: () => void): void;
   reload(): void;
 } {
-  const [settled, setSettled] = useState<Settled>({ login: "", years: NONE, error: null });
+  const [settled, setSettled] = useState<Settled>({ login: "", gen: -1, years: NONE, error: null });
   const [pendingState, setPendingState] = useState<Pending>({ login: "", years: NO_PENDING });
   const [toggleError, setToggleError] = useState<ToggleError | null>(null);
   const [reloads, setReloads] = useState(0);
+  const gated = useGatedTick(tick, (g) => settled.login !== login || settled.gen !== g);
   const latest = useRef(createLatest());
   const pendingRef = useRef(new Set<string>());
   const mounted = useRef(true);
@@ -43,17 +45,17 @@ export function useYears(
       .run((signal) => getYears(login, signal))
       .then((res) => {
         if (cancelled || !res.ok) return;
-        setSettled({ login, years: res.value, error: null });
+        setSettled({ login, gen: gated, years: res.value, error: null });
       })
       .catch((e) => {
         if (cancelled) return;
         const error = e instanceof Error ? e.message : "Could not load years";
-        setSettled((prev) => ({ login, years: prev.login === login ? prev.years : NONE, error }));
+        setSettled((prev) => ({ login, gen: gated, years: prev.login === login ? prev.years : NONE, error }));
       });
     return () => {
       cancelled = true;
     };
-  }, [login, tick, reloads]);
+  }, [login, gated, reloads]);
 
   const syncPending = useCallback((forLogin: string) => {
     const prefix = `${forLogin}|`;
@@ -83,7 +85,7 @@ export function useYears(
           if (mounted.current) onApplied?.();
           try {
             const res = await latest.current.run((signal) => getYears(login, signal));
-            if (res.ok && mounted.current) setSettled({ login, years: res.value, error: null });
+            if (res.ok && mounted.current) setSettled({ login, gen: gated, years: res.value, error: null });
           } catch {}
         }
         pendingRef.current.delete(key);
@@ -93,7 +95,7 @@ export function useYears(
         setReloads((n) => n + 1);
       })();
     },
-    [login, syncPending],
+    [login, syncPending, gated],
   );
 
   const reload = useCallback(() => setReloads((n) => n + 1), []);
