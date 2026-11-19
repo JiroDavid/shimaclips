@@ -38,6 +38,22 @@ def all_mentioned(svc: Services, question: str) -> list[str]:
     return found
 
 
+WHO_IS = re.compile(
+    r"^\s*(?:hey\W+|hi\W+|so\W+)?(?:who(?:'s|s| is)|tell me about|what do you know about)\s+@?([a-z0-9_ ]{2,40}?)\s*[?.!]*\s*$",
+    re.I,
+)
+
+
+def who_is_target(svc: Services, question: str, default_login: str | None) -> str | None:
+    m = WHO_IS.match(question)
+    if not m:
+        return None
+    name = clean_login(m.group(1))
+    if name and (name in svc.store.known_logins() or name == (default_login or "")):
+        return name
+    return None
+
+
 def mentioned(svc: Services, question: str) -> str | None:
     found = all_mentioned(svc, question)
     return found[0] if found else None

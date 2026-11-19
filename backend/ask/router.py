@@ -63,7 +63,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_clips",
-            "description": "Find clips about a topic or event by what is said in them. Use for any question about what happened, was said, who someone is, or when something occurred.",
+            "description": "Find clips about a topic or event by what is said in them. Use for any question about what happened, was said, or when something occurred, and for who or what a nickname, running joke or non-streamer is.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -78,7 +78,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "streamer_info",
-            "description": "Basic facts about a streamer's channel: when the account was created and how many clips are stored.",
+            "description": "Who a streamer is: their Twitch profile (bio, partner status, account age, live status) plus a few of their top clips. Use for 'who is <streamer>' or 'tell me about <streamer>'.",
             "parameters": {"type": "object", "properties": {"streamer": STREAMER}, "required": []},
         },
     },

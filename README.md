@@ -38,7 +38,7 @@ A short list of streamers is kept preloaded in the background while the app is r
 ## Ask about clips (AI)
 The home page is a chat box. Ask in plain English and get an answer with clickable, cited clips. It runs fully locally and costs nothing per question. The calendar view lives at `/browse` and is reachable from the small streamer lookup under the chat box.
 
-A sidebar on the left lists your past chats (Recents). Click one to reopen it exactly as you left it and keep asking, start a new one with "New chat" or by clicking the logo, and delete one with the x that appears on hover. Chats are stored only on your computer, in the same SQLite database as the clip cache (`backend/shimaclips.db`, gitignored), so they survive restarts and browser changes. The sidebar can be collapsed, and "Browse calendar" in it opens the streamer lookup for the calendar view.
+A sidebar on the left lists your past chats (Recents). Click one to reopen it exactly as you left it and keep asking, start a new one with "New chat" or by clicking the logo, and delete one with the x that appears on hover. Chats are stored only on your computer, in the same SQLite database as the clip cache (`backend/shimaclips.db`, gitignored), so they survive restarts and browser changes. The sidebar can be collapsed, and "Manual Streamer Search" in it opens a streamer lookup that takes you to that streamer's calendar view.
 
 You do not need to pick a streamer first. Name one in the question ("top 10 clips for each month of 2026 for jasontheween") and it is detected and checked against Twitch. If the name is not a real channel, it suggests the closest matches. After the first answer the streamer is remembered for follow-up questions.
 

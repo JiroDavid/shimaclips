@@ -1,5 +1,7 @@
+import re
 import time
-from datetime import date
+from dataclasses import asdict
+from datetime import date, timedelta
 
 import httpx
 
@@ -8,7 +10,7 @@ from ask.live_data import ensure_range, is_exact, top_by_month
 from ask.router import CHAT_MODEL, OLLAMA, route, with_dates
 from ask.search import search_clips
 from ask.services import Services
-from ask.streamers import all_mentioned, mentioned, public, resolve, split_names
+from ask.streamers import all_mentioned, clean_login, mentioned, public, resolve, split_names, who_is_target
 from ask.tools import ToolError, count_clips, open_readonly, top_clips
 from twitch import TwitchError
 
@@ -69,6 +71,52 @@ def _unknown_streamer_answer(res: dict) -> str:
         names = ", ".join(s["display_name"] for s in res["suggestions"])
         return f"Hey, I couldn't find a streamer called '{res['name']}'. Did you mean one of these: {names}?"
     return f"Hey, I couldn't find a streamer called '{res['name']}'. Check the spelling and try again."
+
+
+BIO_MAX = 400
+EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+TYPES = {"partner": "a Twitch Partner", "affiliate": "a Twitch Affiliate"}
+
+
+def _is_known(svc: Services, name: str | None, default_login: str) -> bool:
+    login = clean_login(str(name or ""))
+    return not login or login == default_login or login in svc.store.known_logins()
+
+
+def _profile(svc: Services, streamer) -> dict | None:
+    if svc.twitch is None:
+        return None
+    try:
+        return svc.twitch().get_profile(streamer.broadcaster_id)
+    except TwitchError:
+        return None
+
+
+def _streamer_info(svc: Services, conn, out: dict, streamer, today: date) -> None:
+    profile = _profile(svc, streamer)
+    kind = TYPES.get(profile["broadcaster_type"], "a Twitch streamer") if profile else "a Twitch streamer"
+    parts = [f"{streamer.display_name} (twitch.tv/{streamer.login}) is {kind}. Their account was created on {streamer.account_created.date().isoformat()}."]
+    if profile is not None:
+        bio = EMAIL.sub("[email hidden]", profile["description"])[:BIO_MAX]
+        parts.append(f'Their Twitch bio says: "{bio}"' if bio else "They have not written a Twitch bio.")
+        if profile["is_live"]:
+            game = f" playing {profile['game_name']}" if profile["game_name"] else ""
+            parts.append(f"They are live right now{game}: {profile['stream_title']}")
+    else:
+        parts.append("I could not reach Twitch for their profile just now.")
+    out["answer"] = " ".join(parts)
+    start = streamer.account_created.date()
+    ensure_range(svc, streamer, start, today + timedelta(days=1), 5, today)
+    clips, _total = svc.store.top_clips(streamer.broadcaster_id, None, None, 5, 0)
+    row = conn.execute(
+        "SELECT COUNT(*), MIN(created_at), MAX(created_at) FROM clips WHERE broadcaster_id = ?", (streamer.broadcaster_id,)
+    ).fetchone()
+    out["sources"] = [asdict(c) for c in clips]
+    if clips:
+        out["after"] = (
+            f"Here are some of their most viewed clips stored in our system. "
+            f"I hold {row[0]:,} of their clips, from {row[1][:10]} to {row[2][:10]}."
+        )
 
 
 def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: str, args: dict, streamer, today: date) -> None:
@@ -156,14 +204,7 @@ def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: 
                 "A clip date is when the clip was made, not necessarily when the stream happened."
             )
     elif tool == "streamer_info":
-        row = conn.execute(
-            "SELECT COUNT(*), MIN(created_at), MAX(created_at) FROM clips WHERE broadcaster_id = ?", (bid,)
-        ).fetchone()
-        out["answer"] = (
-            f"{streamer.display_name} (twitch.tv/{streamer.login}) created their account on "
-            f"{streamer.account_created.date().isoformat()}. I hold {row[0]:,} of their clips"
-            + (f", from {row[1][:10]} to {row[2][:10]}." if row[0] else ".")
-        )
+        _streamer_info(svc, conn, out, streamer, today)
     else:
         out["answer"] = "I could not work out how to answer that with the clip library."
         out["confident"] = False
@@ -192,14 +233,23 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
         out["confident"] = False
         return finish()
 
-    routed = route(question, default_login)
+    target = who_is_target(svc, question, default_login)
+    if target is not None:
+        routed = {"tool": "streamer_info", "args": {"streamer": target}, "usage": dict(NO_USAGE)}
+        out["shortcut"] = "who-is question about a known streamer"
+    else:
+        routed = route(question, default_login)
     _add(usage, routed["usage"])
     if routed["tool"] is None:
         routed = {"tool": "search_clips", "args": {"query": question}, "usage": routed["usage"]}
         out["fallback"] = "no tool chosen, searched clips instead"
-    out["tool"], out["args"] = routed["tool"], routed["args"]
     args = dict(routed["args"])
     name = args.pop("streamer", None) or mentioned(svc, question) or default_login
+    if routed["tool"] == "streamer_info" and default_login and not _is_known(svc, name, default_login):
+        routed = {"tool": "search_clips", "args": {"query": question}, "usage": routed["usage"]}
+        args, name = dict(routed["args"]), default_login
+        out["fallback"] = "not a known streamer, searched the clips instead"
+    out["tool"], out["args"] = routed["tool"], routed["args"]
     if not name:
         out["kind"] = "needs_streamer"
         out["answer"] = "Which streamer do you mean? Include their name, for example 'jasontheween'."

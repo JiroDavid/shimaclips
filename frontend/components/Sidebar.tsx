@@ -93,7 +93,7 @@ export default function Sidebar({
         </button>
         <button onClick={() => setLookupOpen((v) => !v)} aria-expanded={lookupOpen} className={ROW}>
           <CalendarIcon />
-          Browse calendar
+          Manual Streamer Search
         </button>
         {lookupOpen && (
           <div className="px-1 pb-1">

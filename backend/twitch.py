@@ -183,6 +183,22 @@ class TwitchClient:
         created = datetime.fromisoformat(u["created_at"].replace("Z", "+00:00")).astimezone(timezone.utc)
         return User(id=u["id"], login=u["login"], display_name=u["display_name"], created_at=created)
 
+    def get_profile(self, user_id: str) -> dict:
+        users = self._get("/users", {"id": user_id})["data"]
+        profile = {
+            "description": (users[0].get("description") or "").strip() if users else "",
+            "broadcaster_type": users[0].get("broadcaster_type", "") if users else "",
+            "profile_image_url": users[0].get("profile_image_url", "") if users else "",
+            "is_live": False, "stream_title": "", "game_name": "", "viewer_count": 0,
+        }
+        live = self._get("/streams", {"user_id": user_id})["data"]
+        if live:
+            profile.update(
+                is_live=True, stream_title=live[0].get("title", ""),
+                game_name=live[0].get("game_name", ""), viewer_count=live[0].get("viewer_count", 0),
+            )
+        return profile
+
     def get_user_by_id(self, user_id: str) -> User | None:
         data = self._get("/users", {"id": user_id})["data"]
         if not data:

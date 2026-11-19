@@ -26,6 +26,10 @@ class FakeTwitch:
     def get_user_by_id(self, uid):
         return None
 
+    def get_profile(self, uid):
+        return {"description": "Hi, mail me at boss@example.com", "broadcaster_type": "partner", "profile_image_url": "",
+                "is_live": True, "stream_title": "late night", "game_name": "Chess", "viewer_count": 5}
+
 
 @pytest.fixture
 def svc(tmp_path):
@@ -214,3 +218,27 @@ def test_newest_on_an_exact_period_is_honoured(monkeypatch, svc):
     monkeypatch.setattr(answer, "is_exact", lambda *a: True)
     r = answer.ask(svc, "newest clips this month", None, TODAY)
     assert r["answer"].startswith("Here are the newest 2") and [c["id"] for c in r["sources"]] == ["c3", "c2"]
+
+
+def test_who_is_a_known_streamer_uses_twitch_profile_then_clips_without_calling_the_router(monkeypatch, svc):
+    monkeypatch.setattr(answer, "classify", lambda q, d=None: ("clips", USAGE))
+    monkeypatch.setattr(answer, "route", lambda *a: (_ for _ in ()).throw(AssertionError("must not route")))
+    r = answer.ask(svc, "hey who is jay?", None, TODAY)
+    assert r["tool"] == "streamer_info" and "a Twitch Partner" in r["answer"] and "live right now playing Chess" in r["answer"]
+    assert "boss@example.com" not in r["answer"] and "[email hidden]" in r["answer"]
+    assert len(r["sources"]) == 3 and "most viewed clips" in r["after"]
+
+
+def test_who_is_something_that_is_not_a_streamer_is_searched_in_the_clips(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="streamer_info", args={"streamer": "burger"})
+    monkeypatch.setattr(answer, "_transcribed", lambda *a: 0)
+    r = answer.ask(svc, "who is burger", "jay", TODAY)
+    assert r["tool"] == "search_clips" and "fallback" in r and r["streamer"]["login"] == "jay"
+
+
+def test_who_is_target_only_matches_known_streamers(svc):
+    from ask.streamers import who_is_target
+    assert who_is_target(svc, "who is jay", None) == "jay"
+    assert who_is_target(svc, "Tell me about @Jay!", None) == "jay"
+    assert who_is_target(svc, "who is burger", None) is None
+    assert who_is_target(svc, "who is jay and why does he clip so much", None) is None
