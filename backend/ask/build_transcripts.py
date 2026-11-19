@@ -9,7 +9,7 @@ DB = "shimaclips.db"
 
 
 def main(limit: int) -> None:
-    conn = sqlite3.connect(DB)
+    conn = sqlite3.connect(DB, timeout=120)
     subset = pick_subset(conn, "jasontheween", "2026-01-01")
     print(f"subset size {len(subset)}", flush=True)
     start = time.monotonic()
