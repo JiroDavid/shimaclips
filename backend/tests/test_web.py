@@ -172,3 +172,9 @@ def test_answers_are_cached_for_a_day(monkeypatch, tmp_path):
 def test_search_never_returns_non_http_links(monkeypatch):
     fake_ddgs(monkeypatch, 0, [{"href": "javascript:alert(1)"}, {"href": "data:text/html,x"}, {"href": "ftp://ok.example/f"}, {"href": "https://ok.example/y"}])
     assert [r["href"] for r in web.search("twitch thing")] == ["https://ok.example/y"]
+
+
+def test_punctuation_and_case_do_not_change_the_cache_key():
+    keys = {web_answer.cache_key(q) for q in ["What are 7TV emotes?", "what are 7tv emotes", "  what are   7TV emotes?! "]}
+    assert len(keys) == 1
+    assert web_answer.cache_key("what is a raid") != web_answer.cache_key("what is a rail")

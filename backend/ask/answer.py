@@ -1,5 +1,6 @@
 import os
 import re
+import sqlite3
 import time
 from dataclasses import asdict
 from datetime import date, timedelta
@@ -67,10 +68,13 @@ def _generate(question: str, results: list[dict]) -> tuple[str, dict]:
 
 
 def _transcribed(conn, broadcaster_id: str) -> int:
-    return conn.execute(
-        "SELECT COUNT(*) FROM transcripts t JOIN clips k ON k.id = t.clip_id WHERE k.broadcaster_id = ?",
-        (broadcaster_id,),
-    ).fetchone()[0]
+    try:
+        return conn.execute(
+            "SELECT COUNT(*) FROM transcripts t JOIN clips k ON k.id = t.clip_id WHERE k.broadcaster_id = ?",
+            (broadcaster_id,),
+        ).fetchone()[0]
+    except sqlite3.OperationalError:
+        return 0
 
 
 def _unknown_streamer_answer(res: dict) -> str:

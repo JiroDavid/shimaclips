@@ -345,3 +345,10 @@ def test_a_nickname_is_resolved_before_twitch_and_the_answer_says_so(monkeypatch
     r = answer.ask(svc, "how many clips did jason get this month", None, TODAY)
     assert r["streamer"]["login"] == "jasontheween" and r["note"] == "I took 'jason' to mean jasontheween."
     assert store.get_streamer("jason") is None
+
+
+def test_a_database_that_has_never_transcribed_anything_counts_zero_instead_of_crashing(tmp_path):
+    import sqlite3
+    conn = sqlite3.connect(tmp_path / "fresh.db")
+    conn.execute("CREATE TABLE clips (id TEXT, broadcaster_id TEXT)")
+    assert answer._transcribed(conn, "1") == 0

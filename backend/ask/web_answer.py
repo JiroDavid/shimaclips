@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS web_cache (
 
 
 def cache_key(question: str) -> str:
-    return hashlib.sha256(" ".join(question.lower().split()).encode()).hexdigest()
+    words = re.sub(r"[^\w\s]", "", question.lower())
+    return hashlib.sha256(" ".join(words.split()).encode()).hexdigest()
 
 
 def build_prompt(question: str, sources: list[Source]) -> str:

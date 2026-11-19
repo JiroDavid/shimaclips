@@ -38,6 +38,8 @@ class JobStore:
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
         self._base = base
+        if base is not None:
+            base.mkdir(parents=True, exist_ok=True)
         sweep(JOB_PREFIX, self._base)
 
     def create(self, clips: list[dict]) -> Job:

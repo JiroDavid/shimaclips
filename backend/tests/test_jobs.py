@@ -109,3 +109,8 @@ def test_sweep_only_removes_folders_older_than_the_limit(tmp_path):
     os.utime(old, (long_ago, long_ago))
     assert sweep("shimaclips_tr_", tmp_path, older_than=3600) == 1
     assert not old.exists() and fresh.exists()
+
+
+def test_a_missing_download_folder_is_created(tmp_path):
+    job = JobStore(tmp_path / "nested" / "jobs").create(CLIPS[:1])
+    assert job.dir.parent == tmp_path / "nested" / "jobs" and job.dir.exists()
