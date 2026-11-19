@@ -121,6 +121,22 @@ function Answer({
           <>
             <p className="whitespace-pre-wrap text-base leading-relaxed">{r.answer}</p>
             {r.note && <p className="text-sm text-amber-400">{r.note}</p>}
+            {r.web_sources && r.web_sources.length > 0 && (
+              <div className="space-y-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3">
+                <p className={LABEL}>Sources from the web</p>
+                <ol className="space-y-1 text-sm">
+                  {r.web_sources.map((w) => (
+                    <li key={w.n} className="truncate">
+                      <span className="text-zinc-500">[{w.n}] </span>
+                      <a href={w.url} target="_blank" rel="noreferrer" className="underline hover:text-zinc-50">
+                        {w.title || w.domain}
+                      </a>
+                      <span className="text-zinc-500"> - {w.domain}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
             {!r.confident && r.kind === "answer" && r.sources.length > 0 && (
               <p className="text-sm text-amber-400">Low confidence: treat these clips as possible leads only.</p>
             )}
@@ -142,7 +158,8 @@ function Answer({
             {r.sources.length > 0 && <ClipGrid clips={r.sources} picker={picker} />}
             {r.after && <p className="text-base leading-relaxed text-zinc-300">{r.after}</p>}
             <p className="border-t border-zinc-800 pt-3 text-xs text-zinc-500">
-              {r.tool ?? "no tool"} - {r.seconds}s - {r.usage.prompt_tokens + r.usage.output_tokens} tokens (local model)
+              {r.web ? "web search" : (r.tool ?? "no tool")} - {r.seconds}s - {r.usage.prompt_tokens + r.usage.output_tokens} tokens (local model)
+              {r.web?.cached && " - cached answer"}
               {r.streamer && (
                 <>
                   {" - "}

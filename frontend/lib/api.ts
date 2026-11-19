@@ -251,6 +251,8 @@ export type AskMonth = {
   clips: Clip[];
 };
 
+export type WebSource = { n: number; title: string; url: string; domain: string };
+
 export type AskResult = {
   question: string;
   kind: "answer" | "refusal" | "needs_streamer" | "unknown_streamer" | "error";
@@ -261,6 +263,8 @@ export type AskResult = {
   suggestions: AskSuggestion[];
   tool: string | null;
   sources: AskSource[];
+  web_sources?: WebSource[];
+  web?: { cached: boolean; seconds: number };
   months: AskMonth[];
   confident: boolean;
   usage: { prompt_tokens: number; output_tokens: number };
