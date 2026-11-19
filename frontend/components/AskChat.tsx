@@ -9,15 +9,15 @@ import { askQuestion, type AskMonth, type AskResult, type Clip } from "@/lib/api
 import { useDownload } from "@/lib/useDownload";
 
 const EXAMPLES = [
-  "Top 10 clips for each month of 2026 for jasontheween",
-  "How many clips did jasontheween get this month?",
-  "Find clips where he talks about boxing",
-  "When did he do his island stream?",
+  "Top 10 clips from last month for arky",
+  "How many clips did shroud get in 2025?",
+  "Top 5 clips of each month of 2025 for stableronaldo",
+  "Top 5 clips this month for yugi",
 ];
 
 const LABEL = "text-xs uppercase tracking-[0.2em] text-zinc-500";
-const FIELD = "border border-zinc-700 bg-[#fbfaf6] outline-none focus:border-zinc-50";
-const INK_BUTTON = "bg-zinc-50 text-zinc-950 hover:bg-zinc-200 disabled:opacity-40";
+const FIELD = "border border-zinc-800 bg-zinc-900 outline-none placeholder:text-zinc-500 focus:border-zinc-600";
+const INK_BUTTON = "bg-accent-strong text-white hover:bg-accent disabled:opacity-40";
 
 type Turn = { id: number; question: string; result: AskResult | null; error: string | null };
 
@@ -32,7 +32,7 @@ function ClipTile({ clip }: { clip: Pick<Clip, "url" | "title" | "thumbnail_url"
       href={clip.url}
       target="_blank"
       rel="noreferrer"
-      className="block overflow-hidden rounded-xl border border-zinc-800 bg-white/60 transition-colors hover:border-zinc-700"
+      className="block overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 transition-colors hover:border-zinc-600"
     >
       {clip.thumbnail_url && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -55,7 +55,7 @@ function Months({ months, onDownload, busy }: { months: AskMonth[]; onDownload: 
       <button
         onClick={() => onDownload(all)}
         disabled={busy || all.length === 0}
-        className="rounded-full border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-800 disabled:opacity-50"
+        className="rounded-full border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-900 disabled:opacity-50"
       >
         {busy ? "Downloading..." : `Download all ${all.length} clips`}
       </button>
@@ -80,15 +80,18 @@ function Months({ months, onDownload, busy }: { months: AskMonth[]; onDownload: 
   );
 }
 
-function Avatar() {
+function Asterisk({ className }: { className: string }) {
   return (
-    <span
-      aria-hidden
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-50 text-sm font-semibold text-zinc-950"
-    >
-      S
-    </span>
+    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+      {[0, 45, 90, 135].map((deg) => (
+        <line key={deg} x1="12" y1="2.5" x2="12" y2="21.5" transform={`rotate(${deg} 12 12)`} />
+      ))}
+    </svg>
   );
+}
+
+function Avatar() {
+  return <Asterisk className="mt-1 h-7 w-7 shrink-0 text-accent" />;
 }
 
 function Thinking() {
@@ -97,7 +100,7 @@ function Thinking() {
       Thinking
       <span className="flex gap-1" aria-hidden>
         {[0, 150, 300].map((d) => (
-          <span key={d} className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-400" style={{ animationDelay: `${d}ms` }} />
+          <span key={d} className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" style={{ animationDelay: `${d}ms` }} />
         ))}
       </span>
     </p>
@@ -119,7 +122,7 @@ function Answer({
   return (
     <div className="flex gap-4">
       <Avatar />
-      <div className="min-w-0 flex-1 space-y-4 rounded-2xl border border-zinc-800 bg-[#fbfaf6] p-6">
+      <div className="min-w-0 flex-1 space-y-4 pt-1">
         <p className={LABEL}>Shimaclips</p>
         {turn.error && <p className="text-base text-red-400">{turn.error}</p>}
         {!turn.error && !r && <Thinking />}
@@ -136,7 +139,7 @@ function Answer({
                   <button
                     key={s.login}
                     onClick={() => onPick(s.login, turn.question)}
-                    className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm hover:bg-zinc-800"
+                    className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm hover:bg-zinc-900"
                   >
                     {s.display_name}
                     {s.is_live && <span className="ml-1 text-xs text-red-400">live</span>}
@@ -222,7 +225,7 @@ export default function AskChat() {
         maxLength={300}
         autoFocus
         aria-label="Ask a question about a streamer's clips"
-        placeholder={current ? `Ask about ${current}'s clips or Twitch` : "Ask about a streamer's clips, for example top clips for jasontheween this month"}
+        placeholder={current ? `Ask about ${current}'s clips or Twitch` : "Ask about any streamer's clips"}
         className={`flex-1 rounded-2xl px-6 ${FIELD} ${empty ? "py-5 text-lg" : "py-4 text-base"}`}
       />
       <button
@@ -254,11 +257,12 @@ export default function AskChat() {
 
   if (empty) {
     return (
+      <div className="theme-warm min-h-screen">
       <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-6 py-10">
         <div className="space-y-3 text-center">
-          <p className={LABEL}>Clip assistant</p>
-          <h1 className="text-5xl font-semibold tracking-tight">Shimaclips</h1>
-          <p className="text-lg text-zinc-400">Ask me anything about a streamer&apos;s Twitch clips.</p>
+          <Asterisk className="mx-auto h-10 w-10 text-accent" />
+          <h1 className="font-serif text-5xl tracking-tight">What clips are you after?</h1>
+          <p className="text-lg text-zinc-400">Ask about any Twitch streamer and their clips.</p>
         </div>
         {form}
         <div className="flex flex-wrap justify-center gap-2">
@@ -266,7 +270,7 @@ export default function AskChat() {
             <button
               key={ex}
               onClick={() => void send(ex)}
-              className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-400 hover:border-zinc-50 hover:text-zinc-50"
+              className="rounded-full border border-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:border-zinc-600 hover:bg-zinc-900"
             >
               {ex}
             </button>
@@ -274,13 +278,15 @@ export default function AskChat() {
         </div>
         <div className="pt-4">{renderLookup("center")}</div>
       </main>
+      </div>
     );
   }
 
   return (
+    <div className="theme-warm min-h-screen">
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-8">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 py-5">
-        <h1 className="text-sm font-semibold uppercase tracking-[0.3em]">Shimaclips</h1>
+        <h1 className="text-sm font-semibold uppercase tracking-[0.3em] text-accent">Shimaclips</h1>
         <div className="flex flex-wrap items-center gap-5 text-sm text-zinc-400">
           {current && (
             <span>
@@ -296,7 +302,7 @@ export default function AskChat() {
       <div className="flex-1 space-y-12 py-10" aria-live="polite">
         {turns.map((t, i) => (
           <div key={t.id} ref={i === count - 1 ? lastTurn : undefined} className="scroll-mt-6 space-y-6">
-            <p className="ml-auto w-fit max-w-[80%] rounded-2xl bg-zinc-50 px-5 py-3 text-base text-zinc-950">{t.question}</p>
+            <p className="ml-auto w-fit max-w-[80%] rounded-2xl bg-zinc-900 px-5 py-3 text-base">{t.question}</p>
             <Answer
               turn={t}
               onPick={(login, q) => {
@@ -312,10 +318,11 @@ export default function AskChat() {
         {download.error && <p className="text-base text-red-400">{download.error}</p>}
         <div className="h-[55vh]" aria-hidden />
       </div>
-      <div className="sticky bottom-0 bg-background pb-8 pt-2">
-        <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-background to-transparent" />
+      <div className="sticky bottom-0 bg-zinc-950 pb-8 pt-2">
+        <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-zinc-950 to-transparent" />
         {form}
       </div>
     </main>
+    </div>
   );
 }

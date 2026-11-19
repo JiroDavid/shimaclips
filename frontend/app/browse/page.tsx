@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import ClipPreview, { PreviewContext } from "@/components/ClipPreview";
 import { createPreviewController } from "@/lib/previewController";
 import CalendarView from "@/components/CalendarView";
@@ -26,7 +27,7 @@ import { useWatchlist } from "@/lib/useWatchlist";
 import { useYears } from "@/lib/useYears";
 import { isWatched } from "@/lib/watchlist";
 
-export default function Home() {
+function Browse() {
   const {
     streamer,
     state,
@@ -39,9 +40,9 @@ export default function Home() {
   } = useStreamer();
   const [preview] = useState(() => createPreviewController({}));
   useEffect(() => () => preview.close(), [preview]);
-  const [lastLogin, setLastLogin] = useState(() =>
-    typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("streamer") ?? ""),
-  );
+  const fromUrl = useSearchParams().get("streamer") ?? "";
+  const [lastLogin, setLastLogin] = useState("");
+  const openedFromUrl = useRef<string | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
   const [selection, setSelection] = useState<{
     login: string;
@@ -118,13 +119,15 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (lastLogin) open(lastLogin);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on arrival from the ask page
-  }, []);
+    if (fromUrl && openedFromUrl.current !== fromUrl) {
+      openedFromUrl.current = fromUrl;
+      open(fromUrl);
+    }
+  }, [fromUrl, open]);
 
   function retry() {
     if (streamer) refresh(false);
-    else open(lastLogin);
+    else open(lastLogin || fromUrl);
   }
 
   return (
@@ -270,5 +273,13 @@ export default function Home() {
       </main>
       <ClipPreview controller={preview} />
     </PreviewContext.Provider>
+  );
+}
+
+export default function BrowsePage() {
+  return (
+    <Suspense>
+      <Browse />
+    </Suspense>
   );
 }

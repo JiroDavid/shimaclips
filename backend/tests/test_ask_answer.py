@@ -189,3 +189,25 @@ def test_search_answer_and_date_note_are_separate_fields(monkeypatch, svc):
     monkeypatch.setattr(answer, "_generate", lambda *a: ("He talks about boxing [1].", USAGE))
     r = answer.ask(svc, "boxing", None, TODAY)
     assert r["answer"] == "He talks about boxing [1]." and "2026-02-03" in r["after"]
+
+
+def test_empty_period_says_no_clips_instead_of_top_zero(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="top_clips", args={"streamer": "jay", "when": "2025", "limit": 5})
+    monkeypatch.setattr(answer, "is_exact", lambda *a: True)
+    r = answer.ask(svc, "top clips 2025", None, TODAY)
+    assert "couldn't find any clips" in r["answer"] and r["sources"] == []
+
+
+def test_newest_on_a_partial_period_falls_back_to_views_and_says_so(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="top_clips", args={"streamer": "jay", "when": "this month", "limit": 2, "sort": "newest"})
+    monkeypatch.setattr(answer, "is_exact", lambda *a: False)
+    r = answer.ask(svc, "newest clips this month", None, TODAY)
+    assert r["answer"].startswith("Here are the top 2") and "sorted by views" in r["after"]
+    assert [c["view_count"] for c in r["sources"]] == [300, 200]
+
+
+def test_newest_on_an_exact_period_is_honoured(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="top_clips", args={"streamer": "jay", "when": "this month", "limit": 2, "sort": "newest"})
+    monkeypatch.setattr(answer, "is_exact", lambda *a: True)
+    r = answer.ask(svc, "newest clips this month", None, TODAY)
+    assert r["answer"].startswith("Here are the newest 2") and [c["id"] for c in r["sources"]] == ["c3", "c2"]

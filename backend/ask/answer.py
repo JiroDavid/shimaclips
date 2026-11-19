@@ -95,13 +95,24 @@ def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: 
                 )
         else:
             limit = max(1, min(int(args.get("limit", 10)), 50))
+            sort = args.get("sort", "views")
             ensure_range(svc, streamer, start, end, limit, today)
-            r = top_clips(conn, streamer.login, args["start"], args["end"], limit, args.get("sort", "views"))
+            exact = is_exact(svc, streamer, start, end, today)
+            notes = []
+            if sort == "newest" and not exact:
+                sort = "views"
+                notes.append("Newest first needs a fully loaded period, so these are sorted by views instead.")
+            r = top_clips(conn, streamer.login, args["start"], args["end"], limit, sort)
             out["data"] = r
             out["sources"] = r["clips"]
-            out["answer"] = f"Here are the top {len(r['clips'])} clips for {streamer.display_name}, {r['start']} to {r['end']}."
-            if not is_exact(svc, streamer, start, end, today):
-                out["after"] = "This period isn't fully loaded yet, so there may be clips with more views than these."
+            if not r["clips"]:
+                out["answer"] = f"I couldn't find any clips for {streamer.display_name} between {r['start']} and {r['end']}."
+            else:
+                label = "newest" if sort == "newest" else "top"
+                out["answer"] = f"Here are the {label} {len(r['clips'])} clips for {streamer.display_name}, {r['start']} to {r['end']}."
+                if not exact:
+                    notes.append("This period isn't fully loaded yet, so there may be clips with more views than these.")
+            out["after"] = " ".join(notes)
     elif tool == "top_clips_by_month":
         year = int(args.get("year", today.year))
         if not 2007 <= year <= today.year:

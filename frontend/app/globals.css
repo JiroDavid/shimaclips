@@ -1,9 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f3f0e8;
-  --foreground: #111111;
-  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #171717;
 }
 
 @theme inline {
@@ -13,34 +12,35 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@theme {
-  --color-zinc-50: #111111;
-  --color-zinc-100: #1c1c1c;
-  --color-zinc-200: #2a2a2a;
-  --color-zinc-300: #3f3e3b;
-  --color-zinc-400: #5f5b55;
-  --color-zinc-500: #6b6860;
-  --color-zinc-600: #8f8a80;
-  --color-zinc-700: #beb8ad;
-  --color-zinc-800: #e6e1d7;
-  --color-zinc-900: #ede9df;
-  --color-zinc-950: #f3f0e8;
-
-  --color-red-300: #a33224;
-  --color-red-400: #b23a2b;
-  --color-red-800: #d69a90;
-  --color-red-900: #ebc6bf;
-  --color-red-950: #f4ddd8;
-
-  --color-amber-300: #7c520a;
-  --color-amber-400: #8a5a0b;
-  --color-amber-600: #c79a4a;
-
-  --color-purple-400: #333333;
-  --color-purple-500: #111111;
-  --color-purple-600: #111111;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
 }
 
 body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@theme {
+  --color-accent: #d97757;
+  --color-accent-strong: #c6613f;
+}
+
+.theme-warm {
+  --color-zinc-50: #faf9f5;
+  --color-zinc-100: #f0eee6;
+  --color-zinc-200: #e5e3da;
+  --color-zinc-300: #c2c0b6;
+  --color-zinc-400: #9c9a92;
+  --color-zinc-500: #85837c;
+  --color-zinc-600: #5e5d59;
+  --color-zinc-700: #4a4944;
+  --color-zinc-800: #3a3936;
+  --color-zinc-900: #30302e;
+  --color-zinc-950: #262624;
+  background-color: #262624;
+  color: #faf9f5;
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }

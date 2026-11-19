@@ -21,11 +21,11 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const LEVEL_CLASS = [
   "bg-zinc-800 hover:bg-zinc-700",
-  "bg-[#cfc9bd] hover:bg-[#beb8ad]",
-  "bg-[#a8a296] hover:bg-[#9a9488]",
-  "bg-[#777777] text-white hover:bg-[#6a6a6a]",
-  "bg-[#333333] text-white hover:bg-[#2a2a2a]",
-  "bg-[#111111] text-white hover:bg-black",
+  "bg-[#0e4429] hover:bg-[#12573a]",
+  "bg-[#006d32] hover:bg-[#08833f]",
+  "bg-[#26a641] hover:bg-[#32bd4f]",
+  "bg-[#39d353] text-zinc-950 hover:bg-[#52e06a]",
+  "bg-[#7ee787] text-zinc-950 hover:bg-[#98f0a0]",
 ] as const;
 
 const DISABLED_CLASS = "cursor-not-allowed bg-zinc-700 opacity-50";
@@ -201,7 +201,7 @@ export default function CalendarView({ login, tick, accountCreated, selectedKey,
         title={approximate ? describe(s) : !s.disabled && s.count === 0 ? "no clips" : undefined}
         onClick={() => onSelect(selected ? null : s.cell.key)}
         className={`flex flex-col items-center justify-center rounded-lg p-2 ${big ? "min-h-16" : "min-h-12"} ${tone} ${approximate ? APPROX_CLASS : ""} ${
-          selected ? "ring-2 ring-zinc-50 ring-offset-2 ring-offset-zinc-950" : ""
+          selected ? "ring-2 ring-white ring-offset-2 ring-offset-zinc-950" : ""
         }`}
       >
         <span className={big ? "text-sm font-semibold" : "text-sm"}>{s.cell.label}</span>
