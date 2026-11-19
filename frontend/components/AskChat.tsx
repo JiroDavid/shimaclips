@@ -1,13 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ClipCard from "@/components/ClipCard";
 import ClipPreview, { PreviewContext } from "@/components/ClipPreview";
 import DownloadPanel from "@/components/DownloadPanel";
-import StreamerSearch from "@/components/StreamerSearch";
-import { askQuestion, type AskMonth, type AskResult, type Clip } from "@/lib/api";
+import Logo from "@/components/Logo";
+import Sidebar from "@/components/Sidebar";
+import {
+  askQuestion,
+  deleteConversation,
+  getConversation,
+  listConversations,
+  type AskMonth,
+  type AskResult,
+  type Clip,
+  type ConversationSummary,
+} from "@/lib/api";
 import { createPreviewController } from "@/lib/previewController";
 import { emptySelection, pluralClips, toggleClip, type Selection } from "@/lib/selection";
 import { useDownload } from "@/lib/useDownload";
@@ -67,13 +76,6 @@ function Months({ months, onDownload, busy, picker }: { months: AskMonth[]; onDo
         </section>
       ))}
     </div>
-  );
-}
-
-function Logo({ className }: { className: string }) {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src="/shiba.png" alt="" width={512} height={512} className={className} />
   );
 }
 
@@ -158,13 +160,17 @@ function Answer({
 }
 
 export default function AskChat() {
-  const router = useRouter();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [text, setText] = useState("");
   const [current, setCurrent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [lookupOpen, setLookupOpen] = useState(false);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const nextId = useRef(0);
+  const thread = useRef(0);
+  const activeRef = useRef<string | null>(null);
   const lastTurn = useRef<HTMLDivElement>(null);
   const download = useDownload("ask");
   const [preview] = useState(() => createPreviewController({}));
@@ -173,26 +179,100 @@ export default function AskChat() {
   useEffect(() => () => preview.close(), [preview]);
   const count = turns.length;
 
+  const refreshList = useCallback(async () => {
+    try {
+      setConversations(await listConversations());
+      setHistoryError(null);
+    } catch {
+      setHistoryError("History is unavailable right now.");
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    listConversations()
+      .then((list) => {
+        if (!cancelled) setConversations(list);
+      })
+      .catch(() => {
+        if (!cancelled) setHistoryError("History is unavailable right now.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (count > 0) lastTurn.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [count]);
+  }, [count, activeId]);
+
+  function newChat() {
+    thread.current += 1;
+    activeRef.current = null;
+    preview.close();
+    setActiveId(null);
+    setTurns([]);
+    setCurrent(null);
+    setText("");
+    setBusy(false);
+    setSelection(emptySelection());
+  }
+
+  async function openConversation(id: string) {
+    if (id === activeRef.current) return;
+    const mine = ++thread.current;
+    preview.close();
+    setBusy(false);
+    try {
+      const c = await getConversation(id);
+      if (mine !== thread.current) return;
+      activeRef.current = c.id;
+      setActiveId(c.id);
+      setTurns(c.turns.map((t) => ({ id: nextId.current++, question: t.question, result: t.result, error: null })));
+      setCurrent([...c.turns].reverse().find((t) => t.result.streamer)?.result.streamer?.login ?? null);
+      setSelection(emptySelection());
+      setHistoryError(null);
+    } catch {
+      if (mine === thread.current) setHistoryError("Could not open that chat.");
+      void refreshList();
+    }
+  }
+
+  async function removeConversation(id: string) {
+    const title = conversations.find((c) => c.id === id)?.title ?? "this chat";
+    if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    try {
+      await deleteConversation(id);
+      if (activeRef.current === id) newChat();
+    } catch {
+      setHistoryError("Could not delete that chat.");
+    }
+    void refreshList();
+  }
 
   async function send(question: string, login: string | null = current) {
     const q = question.trim();
     if (q.length < 3 || busy) return;
+    const mine = thread.current;
     const id = nextId.current++;
     setBusy(true);
     setText("");
     setTurns((t) => [...t, { id, question: q, result: null, error: null }]);
     const patch = (p: Partial<Turn>) => setTurns((t) => t.map((x) => (x.id === id ? { ...x, ...p } : x)));
     try {
-      const result = await askQuestion(q, login);
+      const result = await askQuestion(q, login, activeRef.current);
+      void refreshList();
+      if (mine !== thread.current) return;
+      if (result.conversation_id) {
+        activeRef.current = result.conversation_id;
+        setActiveId(result.conversation_id);
+      }
       patch({ result });
       if (result.streamer) setCurrent(result.streamer.login);
     } catch (e) {
-      patch({ error: e instanceof Error ? e.message : "Request failed" });
+      if (mine === thread.current) patch({ error: e instanceof Error ? e.message : "Request failed" });
     } finally {
-      setBusy(false);
+      if (mine === thread.current) setBusy(false);
     }
   }
 
@@ -225,72 +305,39 @@ export default function AskChat() {
     </form>
   );
 
-  const renderLookup = (align: "center" | "right") => (
-    <div className="relative flex flex-col items-center">
-      <button
-        onClick={() => setLookupOpen((v) => !v)}
-        aria-expanded={lookupOpen}
-        className="text-sm text-zinc-400 underline decoration-zinc-700 underline-offset-4 hover:text-zinc-50"
-      >
-        Browse a streamer&apos;s calendar
-      </button>
-      {lookupOpen && (
-        <div className={`absolute top-full z-10 mt-2 w-80 ${align === "center" ? "left-1/2 -translate-x-1/2" : "right-0"}`}>
-          <StreamerSearch onSelect={(login) => router.push(`/browse?streamer=${encodeURIComponent(login)}`)} />
-        </div>
-      )}
-    </div>
-  );
-
-  const withPreview = (node: React.ReactNode) => (
-    <PreviewContext.Provider value={preview}>
-      {node}
-      <ClipPreview controller={preview} />
-    </PreviewContext.Provider>
-  );
-
-  if (empty) {
-    return withPreview(
-      <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-6 py-10">
-        <div className="space-y-3 text-center">
-          <Logo className="mx-auto h-24 w-24" />
-          <h1 className="text-5xl font-semibold tracking-tight">What clips are you after?</h1>
-          <p className="text-lg text-zinc-400">Ask about any Twitch streamer and their clips.</p>
-        </div>
-        {form}
-        <div className="flex flex-wrap justify-center gap-2">
-          {EXAMPLES.map((ex) => (
-            <button
-              key={ex}
-              onClick={() => void send(ex)}
-              className="rounded-full border border-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:border-zinc-600 hover:bg-zinc-900"
-            >
-              {ex}
+  const content = empty ? (
+    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-6 py-10">
+      <div className="space-y-3 text-center">
+        <Logo className="mx-auto h-24 w-24" />
+        <h1 className="text-5xl font-semibold tracking-tight">What clips are you after?</h1>
+        <p className="text-lg text-zinc-400">Ask about any Twitch streamer and their clips.</p>
+      </div>
+      {form}
+      <div className="flex flex-wrap justify-center gap-2">
+        {EXAMPLES.map((ex) => (
+          <button
+            key={ex}
+            onClick={() => void send(ex)}
+            className="rounded-full border border-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:border-zinc-600 hover:bg-zinc-900"
+          >
+            {ex}
+          </button>
+        ))}
+      </div>
+    </main>
+  ) : (
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-8">
+      <div className="flex h-14 items-center justify-end text-sm text-zinc-400">
+        {current && (
+          <span>
+            Talking about <span className="font-medium text-zinc-50">{current}</span>{" "}
+            <button onClick={() => setCurrent(null)} className="underline hover:text-zinc-50">
+              clear
             </button>
-          ))}
-        </div>
-        <div className="pt-4">{renderLookup("center")}</div>
-      </main>,
-    );
-  }
-
-  return withPreview(
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-8">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 py-5">
-        <h1 className="text-sm font-semibold uppercase tracking-[0.3em]">Shimaclips</h1>
-        <div className="flex flex-wrap items-center gap-5 text-sm text-zinc-400">
-          {current && (
-            <span>
-              Talking about <span className="font-medium text-zinc-50">{current}</span>{" "}
-              <button onClick={() => setCurrent(null)} className="underline hover:text-zinc-50">
-                clear
-              </button>
-            </span>
-          )}
-          {renderLookup("right")}
-        </div>
-      </header>
-      <div className="flex-1 space-y-12 py-10" aria-live="polite">
+          </span>
+        )}
+      </div>
+      <div className="flex-1 space-y-12 py-6" aria-live="polite">
         {turns.map((t, i) => (
           <div key={t.id} ref={i === count - 1 ? lastTurn : undefined} className="scroll-mt-6 space-y-6">
             <p className="ml-auto w-fit max-w-[80%] rounded-2xl bg-zinc-900 px-5 py-3 text-base">{t.question}</p>
@@ -331,6 +378,25 @@ export default function AskChat() {
         )}
         {form}
       </div>
-    </main>,
+    </main>
+  );
+
+  return (
+    <PreviewContext.Provider value={preview}>
+      <div className="flex min-h-screen">
+        <Sidebar
+          open={sidebarOpen}
+          onToggle={() => setSidebarOpen((v) => !v)}
+          conversations={conversations}
+          activeId={activeId}
+          error={historyError}
+          onNew={newChat}
+          onOpen={(id) => void openConversation(id)}
+          onDelete={(id) => void removeConversation(id)}
+        />
+        <div className="min-w-0 flex-1">{content}</div>
+      </div>
+      <ClipPreview controller={preview} />
+    </PreviewContext.Provider>
   );
 }

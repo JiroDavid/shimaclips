@@ -265,14 +265,39 @@ export type AskResult = {
   confident: boolean;
   usage: { prompt_tokens: number; output_tokens: number };
   seconds: number;
+  conversation_id?: string;
 };
 
-export async function askQuestion(question: string, login: string | null): Promise<AskResult> {
+export async function askQuestion(
+  question: string,
+  login: string | null,
+  conversationId: string | null,
+): Promise<AskResult> {
   const r = await fetch(`${API}/api/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, login }),
+    body: JSON.stringify({ question, login, conversation_id: conversationId }),
   });
   if (!r.ok) throw new Error(await errorMessage(r));
   return r.json();
+}
+
+export type ConversationSummary = { id: string; title: string; updated_at: string };
+export type Conversation = { id: string; title: string; turns: { question: string; result: AskResult }[] };
+
+export async function listConversations(): Promise<ConversationSummary[]> {
+  const r = await fetch(`${API}/api/conversations`);
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return (await r.json()).conversations;
+}
+
+export async function getConversation(id: string): Promise<Conversation> {
+  const r = await fetch(`${API}/api/conversations/${encodeURIComponent(id)}`);
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return r.json();
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+  const r = await fetch(`${API}/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!r.ok) throw new Error(await errorMessage(r));
 }
