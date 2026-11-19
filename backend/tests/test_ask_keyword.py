@@ -1,6 +1,6 @@
 import sqlite3
 
-from ask.keyword import fuse, keyword_search, match_query, rebuild
+from ask.keyword import fuse, keyword_search, match_query, rebuild, unseen_words
 from ask.retrieve import Hit
 
 
@@ -20,7 +20,7 @@ def make():
 def test_stopwords_and_quoting():
     assert match_query("Find clips where he talks about chess") == '"chess"'
     assert match_query("the a of") is None
-    assert match_query('say "hi" AND NEAR(') == '"say" OR "hi" OR "near"'
+    assert match_query('say "hi" AND NEAR(') == '"hi" OR "near"'
 
 
 def test_keyword_search_finds_and_ranks():
@@ -38,3 +38,13 @@ def test_fuse_rewards_agreement():
     a = [Hit("x", 1), Hit("y", 0.9)]
     b = [Hit("y", 5), Hit("z", 4)]
     assert fuse([a, b], k=3)[0].clip_id == "y"
+
+
+def test_unseen_words_flags_terms_absent_from_the_library():
+    c = make()
+    assert unseen_words(c, "clips about poker and chess") == ["poker"]
+    assert unseen_words(c, "find clips about someone's island") == ["someone"]
+
+
+def test_apostrophes_do_not_create_bad_terms():
+    assert match_query("someone's birthday") == '"someone" OR "birthday"'

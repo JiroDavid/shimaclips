@@ -1,9 +1,10 @@
 import sqlite3
 
+from ask.keyword import unseen_words
 from ask.retrieve import search
 from ask.tools import MAX_LIMIT, ToolError, _broadcaster
 
-LOW_CONFIDENCE = 0.55
+STRONG_MATCH = 0.70
 
 
 def search_clips(conn: sqlite3.Connection, login: str, query: str, limit: int = 5, kind: str = "transcript") -> dict:
@@ -29,4 +30,9 @@ def search_clips(conn: sqlite3.Connection, login: str, query: str, limit: int = 
         if len(results) == limit:
             break
     best = results[0]["score"] if results else 0.0
-    return {"login": login, "query": query, "results": results, "confident": best >= LOW_CONFIDENCE}
+    unseen = unseen_words(conn, query)
+    confident = bool(results) and not (unseen and best < STRONG_MATCH)
+    return {
+        "login": login, "query": query, "results": results, "confident": confident,
+        "unseen_words": unseen,
+    }

@@ -8,11 +8,6 @@ from ask.router import CHAT_MODEL, OLLAMA, route, with_dates
 from ask.search import search_clips
 from ask.tools import ToolError, count_clips, top_clips
 
-LOW_CONFIDENCE_ANSWER = (
-    "I could not find clips that clearly match this. These are the closest ones, "
-    "but I would not rely on them. Clips only cover moments that someone chose to clip."
-)
-
 ANSWER_SYSTEM = (
     "You answer a question about a Twitch streamer using ONLY the numbered clips given. "
     "Cite clips as [1], [2]. Each clip has a clip date, which is when it was clipped and may differ "
@@ -70,7 +65,12 @@ def ask(conn: sqlite3.Connection, question: str, login: str, today: date | None 
             if not r["results"]:
                 out["answer"] = "No transcribed clips matched."
             elif not r["confident"]:
-                out["answer"] = LOW_CONFIDENCE_ANSWER
+                missing = ", ".join(f"'{w}'" for w in r["unseen_words"])
+                out["answer"] = (
+                    f"I could not find anything about this: no transcribed clip mentions {missing}. "
+                    "These are the closest clips by meaning, but they probably do not match. "
+                    "Only top clips from 2026 are transcribed."
+                )
             else:
                 out["answer"], u = _generate(question, r["results"])
                 usage = {k: usage[k] + u[k] for k in usage}

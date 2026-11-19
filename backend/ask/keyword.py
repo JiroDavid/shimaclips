@@ -4,11 +4,11 @@ import sqlite3
 from ask.retrieve import Hit
 
 SCHEMA = "CREATE VIRTUAL TABLE IF NOT EXISTS clip_fts USING fts5(clip_id UNINDEXED, title, text)"
-_WORD = re.compile(r"[a-z0-9']+")
+_WORD = re.compile(r"[a-z0-9]+")
 _STOP = {
     "the", "a", "an", "of", "to", "in", "on", "at", "for", "and", "or", "is", "are", "was", "were", "he",
     "his", "him", "she", "her", "they", "it", "that", "this", "about", "with", "talks", "talk", "talking",
-    "clips", "clip", "find", "show", "me", "when", "did", "do", "does", "where", "what", "who", "how",
+    "clips", "clip", "mentioned", "mention", "happened", "said", "say", "find", "show", "me", "when", "did", "do", "does", "where", "what", "who", "how",
 }
 
 
@@ -23,11 +23,25 @@ def rebuild(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) FROM clip_fts").fetchone()[0]
 
 
-def match_query(question: str) -> str | None:
+def content_words(question: str) -> list[str]:
     words = [w for w in _WORD.findall(question.lower()) if w not in _STOP and len(w) > 1]
+    return list(dict.fromkeys(words))
+
+
+def match_query(question: str) -> str | None:
+    words = content_words(question)
     if not words:
         return None
-    return " OR ".join(f'"{w}"' for w in dict.fromkeys(words))
+    return " OR ".join(f'"{w}"' for w in words)
+
+
+def unseen_words(conn: sqlite3.Connection, question: str) -> list[str]:
+    missing = []
+    for w in content_words(question):
+        n = conn.execute("SELECT COUNT(*) FROM clip_fts WHERE clip_fts MATCH ?", (f'"{w}"',)).fetchone()[0]
+        if n == 0:
+            missing.append(w)
+    return missing
 
 
 def keyword_search(conn: sqlite3.Connection, question: str, k: int = 5, include_title_only: bool = True) -> list[Hit]:

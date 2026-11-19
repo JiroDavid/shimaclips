@@ -1,0 +1,922 @@
+{
+  "ran_at": "2026-11-19 10:30:44",
+  "today": "2026-11-19",
+  "structured": [
+    {
+      "id": "s01",
+      "question": "How many clips does he have this month?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "this month"
+      },
+      "usage": {
+        "prompt_tokens": 461,
+        "output_tokens": 28
+      },
+      "seconds": 1.1
+    },
+    {
+      "id": "s02",
+      "question": "How many clips did he get last month?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "last month"
+      },
+      "usage": {
+        "prompt_tokens": 461,
+        "output_tokens": 28
+      },
+      "seconds": 0.63
+    },
+    {
+      "id": "s03",
+      "question": "How many clips did he get in 2025?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "2025"
+      },
+      "usage": {
+        "prompt_tokens": 463,
+        "output_tokens": 28
+      },
+      "seconds": 0.66
+    },
+    {
+      "id": "s04",
+      "question": "How many clips in March 2026?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "March 2026"
+      },
+      "usage": {
+        "prompt_tokens": 461,
+        "output_tokens": 30
+      },
+      "seconds": 0.67
+    },
+    {
+      "id": "s05",
+      "question": "How many clips were made yesterday?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "yesterday"
+      },
+      "usage": {
+        "prompt_tokens": 459,
+        "output_tokens": 28
+      },
+      "seconds": 0.63
+    },
+    {
+      "id": "s06",
+      "question": "How many clips did ludwig get in 2024?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "ludwig",
+        "when": "2024"
+      },
+      "usage": {
+        "prompt_tokens": 464,
+        "output_tokens": 27
+      },
+      "seconds": 0.61
+    },
+    {
+      "id": "s07",
+      "question": "What are the top 10 clips this month?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "sort": "views",
+        "login": "jasontheween",
+        "when": "this month",
+        "limit": "10"
+      },
+      "usage": {
+        "prompt_tokens": 462,
+        "output_tokens": 40
+      },
+      "seconds": 0.85
+    },
+    {
+      "id": "s08",
+      "question": "Show me the top 5 clips last week",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "last week",
+        "limit": "5",
+        "sort": "views"
+      },
+      "usage": {
+        "prompt_tokens": 461,
+        "output_tokens": 40
+      },
+      "seconds": 0.87
+    },
+    {
+      "id": "s09",
+      "question": "Most viewed clips of 2025",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "10",
+        "sort": "views",
+        "login": "jasontheween",
+        "when": "2025"
+      },
+      "usage": {
+        "prompt_tokens": 459,
+        "output_tokens": 40
+      },
+      "seconds": 0.93
+    },
+    {
+      "id": "s10",
+      "question": "Show the 3 newest clips from October 2026",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "October 2026",
+        "limit": "3",
+        "sort": "newest",
+        "login": "jasontheween"
+      },
+      "usage": {
+        "prompt_tokens": 463,
+        "output_tokens": 43
+      },
+      "seconds": 0.92
+    },
+    {
+      "id": "s11",
+      "question": "Give me the 20 most viewed clips in January 2026",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "20",
+        "login": "jasontheween",
+        "sort": "views",
+        "when": "January 2026"
+      },
+      "usage": {
+        "prompt_tokens": 465,
+        "output_tokens": 42
+      },
+      "seconds": 0.96
+    },
+    {
+      "id": "s12",
+      "question": "Top 3 clips this week",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "3",
+        "sort": "views",
+        "login": "jasontheween",
+        "when": "this week"
+      },
+      "usage": {
+        "prompt_tokens": 458,
+        "output_tokens": 40
+      },
+      "seconds": 0.91
+    },
+    {
+      "id": "h01",
+      "question": "how many clips did he get in the past 30 days?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "past 30 days"
+      },
+      "usage": {
+        "prompt_tokens": 465,
+        "output_tokens": 30
+      },
+      "seconds": 0.74
+    },
+    {
+      "id": "h02",
+      "question": "how many clips in the month before last",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "month before last"
+      },
+      "usage": {
+        "prompt_tokens": 460,
+        "output_tokens": 29
+      },
+      "seconds": 0.71
+    },
+    {
+      "id": "h03",
+      "question": "how mny clips did he get in Octobr",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "October"
+      },
+      "usage": {
+        "prompt_tokens": 463,
+        "output_tokens": 27
+      },
+      "seconds": 0.67
+    },
+    {
+      "id": "h04",
+      "question": "top 5 most watched clips from September",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "5",
+        "sort": "views",
+        "login": "jasontheween",
+        "when": "September"
+      },
+      "usage": {
+        "prompt_tokens": 460,
+        "output_tokens": 39
+      },
+      "seconds": 0.89
+    },
+    {
+      "id": "h05",
+      "question": "what is his biggest clip of 2026",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "this year",
+        "limit": "1",
+        "sort": "views",
+        "login": "jasontheween"
+      },
+      "usage": {
+        "prompt_tokens": 461,
+        "output_tokens": 40
+      },
+      "seconds": 0.95
+    },
+    {
+      "id": "h06",
+      "question": "how many clips were made on 2026-11-10",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "2026-11-10"
+      },
+      "usage": {
+        "prompt_tokens": 465,
+        "output_tokens": 32
+      },
+      "seconds": 0.7
+    },
+    {
+      "id": "h07",
+      "question": "top 10 clips in the last 7 days",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "last 7 days",
+        "limit": "10",
+        "sort": "views",
+        "login": "jasontheween"
+      },
+      "usage": {
+        "prompt_tokens": 462,
+        "output_tokens": 42
+      },
+      "seconds": 0.91
+    },
+    {
+      "id": "h08",
+      "question": "number of clips last year",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "when": "last year",
+        "login": "jasontheween"
+      },
+      "usage": {
+        "prompt_tokens": 457,
+        "output_tokens": 28
+      },
+      "seconds": 0.65
+    },
+    {
+      "id": "h09",
+      "question": "which clips got the most views in Feb 2026? just 4",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "4",
+        "login": "jasontheween",
+        "sort": "views",
+        "when": "Feb 2026"
+      },
+      "usage": {
+        "prompt_tokens": 467,
+        "output_tokens": 42
+      },
+      "seconds": 0.91
+    },
+    {
+      "id": "h10",
+      "question": "count his clips for this year",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "this year"
+      },
+      "usage": {
+        "prompt_tokens": 458,
+        "output_tokens": 28
+      },
+      "seconds": 0.64
+    }
+  ],
+  "retrieval": {
+    "title_embed": {
+      "hit@5": 0.667,
+      "precision@5": 0.417,
+      "mrr": 0.667
+    },
+    "transcript_embed": {
+      "hit@5": 0.667,
+      "precision@5": 0.533,
+      "mrr": 0.667
+    },
+    "keyword": {
+      "hit@5": 1.0,
+      "precision@5": 0.9,
+      "mrr": 1.0
+    },
+    "hybrid": {
+      "hit@5": 1.0,
+      "precision@5": 0.733,
+      "mrr": 0.875
+    }
+  },
+  "retrieval_detail": [
+    {
+      "id": "q01",
+      "n_relevant": 41,
+      "title_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "q02",
+      "n_relevant": 15,
+      "title_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "q03",
+      "n_relevant": 19,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.4
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.8
+      }
+    },
+    {
+      "id": "q04",
+      "n_relevant": 35,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "q05",
+      "n_relevant": 36,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.4
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "q06",
+      "n_relevant": 17,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.2
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 0.2
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 0.2
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    },
+    {
+      "id": "q07",
+      "n_relevant": 13,
+      "title_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "transcript_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    },
+    {
+      "id": "q08",
+      "n_relevant": 10,
+      "title_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "transcript_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    },
+    {
+      "id": "q09",
+      "n_relevant": 44,
+      "title_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "transcript_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    },
+    {
+      "id": "q10",
+      "n_relevant": 16,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.8
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "m01",
+      "n_relevant": 35,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "m02",
+      "n_relevant": 11,
+      "title_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "transcript_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    }
+  ],
+  "pipeline_semantic": [
+    {
+      "id": "q01",
+      "question": "Find clips where he talks about boxing",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "Clips [1], [2], and [5] mention boxing.\n\n[1]: Discusses a potential fight with Julia.\n[2]: Announces a boxing match between Ricegum and Alex Wasabi.\n[5]: Mentions his own experience as a boxer.",
+      "usage": {
+        "prompt_tokens": 1065,
+        "output_tokens": 83
+      },
+      "seconds": 2.21
+    },
+    {
+      "id": "q02",
+      "question": "Find clips about resident evil",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "Clips [1], [2], [4] mention \"Resident Evil\". Clip [3] mentions \"Resident Evil\" but in a different context.",
+      "usage": {
+        "prompt_tokens": 825,
+        "output_tokens": 62
+      },
+      "seconds": 1.88
+    },
+    {
+      "id": "q03",
+      "question": "Find clips where he goes fishing",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "Clips [1], [3] show Jason going fishing and discussing his technique. Clip [2] shows him trying to gut a fish after catching it.",
+      "usage": {
+        "prompt_tokens": 908,
+        "output_tokens": 61
+      },
+      "seconds": 1.91
+    },
+    {
+      "id": "q04",
+      "question": "What happened on the island stream?",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 4,
+      "cited": 5,
+      "answer": "According to [1] and [2], Jason was stranded on an island for 7 days. He experienced \"seven days of hell\" and had no sleep, but also said that in a way, the island became home.",
+      "usage": {
+        "prompt_tokens": 1000,
+        "output_tokens": 76
+      },
+      "seconds": 2.28
+    },
+    {
+      "id": "q05",
+      "question": "Find clips about someone's birthday",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "Clips [2], [3], and [4] mention a birthday celebration. Clip [1] simply says \"are you happy birthday\" but doesn't provide context. Clip [5] mentions knowing the person's birthday but doesn't celebrate it.",
+      "usage": {
+        "prompt_tokens": 877,
+        "output_tokens": 79
+      },
+      "seconds": 2.24
+    },
+    {
+      "id": "q06",
+      "question": "Find clips where he is on a facetime call",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 2,
+      "cited": 5,
+      "answer": "Clips [1] and [2] show Jason being on a FaceTime call. Clip [1] shows Ellysa calling him, while clip [2] shows an aunt trying to contact him via FaceTime.",
+      "usage": {
+        "prompt_tokens": 988,
+        "output_tokens": 75
+      },
+      "seconds": 2.27
+    },
+    {
+      "id": "q07",
+      "question": "Find clips about New York",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 0,
+      "cited": 5,
+      "answer": "There are no clips that mention \"New York\".",
+      "usage": {
+        "prompt_tokens": 666,
+        "output_tokens": 39
+      },
+      "seconds": 1.35
+    },
+    {
+      "id": "q08",
+      "question": "Find clips where he talks about Japan",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 0,
+      "cited": 5,
+      "answer": "There are no clips that mention Japan.",
+      "usage": {
+        "prompt_tokens": 676,
+        "output_tokens": 36
+      },
+      "seconds": 1.3
+    },
+    {
+      "id": "q09",
+      "question": "Find clips with Lacy",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 0,
+      "cited": 5,
+      "answer": "There are no clips that mention the name \"Lacy\".",
+      "usage": {
+        "prompt_tokens": 672,
+        "output_tokens": 41
+      },
+      "seconds": 1.41
+    },
+    {
+      "id": "q10",
+      "question": "Who is burger?",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "The clips do not provide information about who \"burger\" is. They only show the streamer and their viewers reacting to or referencing someone named \"burger\", but it is unclear what this refers to.",
+      "usage": {
+        "prompt_tokens": 919,
+        "output_tokens": 68
+      },
+      "seconds": 2.07
+    }
+  ],
+  "pipeline_mixed": [
+    {
+      "id": "m01",
+      "question": "When did he do his island stream?",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 4,
+      "cited": 5,
+      "answer": "According to clip [1], Jason's 7-day island stream ended on the boat. Clip [2] confirms that it was a rescue by boat, but doesn't specify when the stream started. However, since the clips are from February 2026 and the stream ended in February, we can infer that the island stream took place in February 2026.",
+      "usage": {
+        "prompt_tokens": 1002,
+        "output_tokens": 103
+      },
+      "seconds": 2.93,
+      "cited_in_window": 4
+    },
+    {
+      "id": "m02",
+      "question": "When was the World Cup mentioned?",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 0,
+      "cited": 5,
+      "answer": "I couldn't find any mention of the World Cup in the provided clips.",
+      "usage": {
+        "prompt_tokens": 670,
+        "output_tokens": 44
+      },
+      "seconds": 1.53,
+      "cited_in_window": 1
+    }
+  ],
+  "pipeline_abstain": [
+    {
+      "id": "a01",
+      "question": "Find clips where he talks about chess",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 2,
+      "cited": 5,
+      "answer": "Clips [1] and [2] mention chess. In clip [1], he discusses playing chess with someone, possibly as part of a 1v1 challenge. In clip [2], he confirms that he will play chess for them.",
+      "usage": {
+        "prompt_tokens": 1033,
+        "output_tokens": 79
+      },
+      "seconds": 2.31,
+      "abstained": false
+    },
+    {
+      "id": "a02",
+      "question": "Find clips where he plays poker",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": false,
+      "cited_relevant": 0,
+      "cited": 5,
+      "answer": "I could not find anything about this: no transcribed clip mentions 'poker'. These are the closest clips by meaning, but they probably do not match. Only top clips from 2026 are transcribed.",
+      "usage": {
+        "prompt_tokens": 458,
+        "output_tokens": 28
+      },
+      "seconds": 0.9,
+      "abstained": true
+    },
+    {
+      "id": "a03",
+      "question": "Find clips about his trip to Florida",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": false,
+      "cited_relevant": 0,
+      "cited": 5,
+      "answer": "I could not find anything about this: no transcribed clip mentions 'florida'. These are the closest clips by meaning, but they probably do not match. Only top clips from 2026 are transcribed.",
+      "usage": {
+        "prompt_tokens": 459,
+        "output_tokens": 29
+      },
+      "seconds": 0.74,
+      "abstained": true
+    }
+  ]
+}

@@ -28,10 +28,10 @@ def test_count_answer_comes_from_the_tool_not_the_model(monkeypatch):
 
 def test_low_confidence_search_does_not_call_the_generator(monkeypatch):
     monkeypatch.setattr(answer, "route", lambda q, l: {"tool": "search_clips", "args": {"query": "x"}, "usage": USAGE})
-    monkeypatch.setattr(answer, "search_clips", lambda conn, **a: {"results": [{"id": "c"}], "confident": False})
+    monkeypatch.setattr(answer, "search_clips", lambda conn, **a: {"results": [{"id": "c"}], "confident": False, "unseen_words": ["poker"]})
     monkeypatch.setattr(answer, "_generate", lambda *a: (_ for _ in ()).throw(AssertionError("must not generate")))
     r = answer.ask(None, "something obscure", "jay", TODAY)
-    assert r["confident"] is False and r["answer"] == answer.LOW_CONFIDENCE_ANSWER and r["sources"]
+    assert r["confident"] is False and "poker" in r["answer"] and r["sources"]
 
 
 def test_bad_date_phrase_is_reported_not_raised(monkeypatch):
