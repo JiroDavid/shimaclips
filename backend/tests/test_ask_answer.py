@@ -333,3 +333,15 @@ def test_who_is_a_non_streamer_with_a_streamer_selected_searches_that_streamers_
 def test_who_is_a_non_streamer_with_nothing_selected_still_offers_suggestions(monkeypatch, svc):
     patch_flow(monkeypatch, tool="search_clips", args={"streamer": "burger", "query": "burger"})
     assert answer.ask(svc, "who is burger", None, TODAY)["kind"] == "unknown_streamer"
+
+
+def test_a_nickname_is_resolved_before_twitch_and_the_answer_says_so(monkeypatch, tmp_path):
+    store = Store(tmp_path / "t.db")
+    store.upsert_streamer(User("1", "jasontheween", "jasontheween", datetime(2015, 1, 1, tzinfo=timezone.utc)))
+    unrelated = FakeTwitch(User("2", "jason", "Jason", datetime(2020, 1, 1, tzinfo=timezone.utc)))
+    svc = Services(store, None, lambda: unrelated)
+    patch_flow(monkeypatch, tool="count_clips", args={"streamer": "jason", "when": "this month"})
+    monkeypatch.setattr(answer, "is_exact", lambda *a: True)
+    r = answer.ask(svc, "how many clips did jason get this month", None, TODAY)
+    assert r["streamer"]["login"] == "jasontheween" and r["note"] == "I took 'jason' to mean jasontheween."
+    assert store.get_streamer("jason") is None

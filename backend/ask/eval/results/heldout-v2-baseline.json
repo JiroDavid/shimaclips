@@ -1,0 +1,166 @@
+{
+  "passed": 13,
+  "total": 16,
+  "rows": [
+    {
+      "id": "h01",
+      "question": "show me marlon's top 5 clips from last month",
+      "ok": true,
+      "note": "tool=top_clips range=2026-10-01..2026-11-01 got 5 clips",
+      "kind": "answer",
+      "tool": "top_clips",
+      "seconds": 10.2,
+      "answer": "Here are the top 5 clips for Marlon from 2026-10-01 to 2026-11-01."
+    },
+    {
+      "id": "h02",
+      "question": "how many clips did ludwig get in 2023",
+      "ok": true,
+      "note": "tool=count_clips count=814 sql=814",
+      "kind": "answer",
+      "tool": "count_clips",
+      "seconds": 1.9,
+      "answer": "At least 814 clips from 2023-01-01 up to (not including) 2024-01-01. This period isn't fully loaded, so the real number is higher."
+    },
+    {
+      "id": "h03",
+      "question": "arky's most viewed clips of this year",
+      "ok": true,
+      "note": "tool=top_clips range=2026-01-01..2027-01-01 got 10 clips",
+      "kind": "answer",
+      "tool": "top_clips",
+      "seconds": 3.0,
+      "answer": "Here are the top 10 clips for Arky from 2026-01-01 to 2027-01-01."
+    },
+    {
+      "id": "h04",
+      "question": "what's the total number of views on stableronaldo's clips in September",
+      "ok": true,
+      "note": "tool=view_stats total=428817",
+      "kind": "answer",
+      "tool": "view_stats",
+      "seconds": 2.0,
+      "answer": "stableronaldo's clips from 2026-09-01 up to (not including) 2026-10-01 averaged 404 views each (median 22, most viewed 61,316), across 1,061 clips and 428,817 views in total."
+    },
+    {
+      "id": "h05",
+      "question": "who is yugi",
+      "ok": true,
+      "note": "kind=unknown_streamer suggestions=['yugi2x', 'yugi421', 'yugiogg']",
+      "kind": "unknown_streamer",
+      "tool": "streamer_info",
+      "seconds": 1.9,
+      "answer": "Hey, I couldn't find a streamer called 'yugi'. Did you mean one of these: Yugi2x, Yugi421, YugioGG, \u857e\u51520602, YUGIARTTT?"
+    },
+    {
+      "id": "h06",
+      "question": "tell me about marlon",
+      "ok": true,
+      "note": "tool=streamer_info clips=5",
+      "kind": "answer",
+      "tool": "streamer_info",
+      "seconds": 1.4,
+      "answer": "Marlon (twitch.tv/marlon) is a Twitch Partner. Their account was created on 2024-01-17. Their Twitch bio says: \"Bunezzz: [email hidden]\" They are live right now playing Grand Theft Auto VI: \ud83c\udf34 PLAYING GTA 6 TILL I COMPLETE IT \ud83c\udf34 LIVE 24/7 \ud83c\udf34 !sub !comm"
+    },
+    {
+      "id": "h07",
+      "question": "what is a twitch affiliate and how is it different from a partner",
+      "ok": true,
+      "note": "cited answer with an expected term",
+      "kind": "answer",
+      "tool": null,
+      "seconds": 11.2,
+      "answer": "According to [1], a Twitch Affiliate is a creator who has already built up a sizable audience and is ready to take their broadcasting to the next level. They must apply and be selected to join the Twitch Partner Program, which offers more advanced monetization options.\n\n[2] states that Affiliates ar"
+    },
+    {
+      "id": "h08",
+      "question": "is the streamer awards still happening this year",
+      "ok": false,
+      "note": "not routed to the web (topic=twitch_other, kind=answer)",
+      "kind": "answer",
+      "tool": null,
+      "seconds": 12.0,
+      "answer": "I couldn't reach the web just now to look that up (the search service didn't answer). Try again in a moment. I can still count clips, show top clips, or search what was said in transcribed clips."
+    },
+    {
+      "id": "h09",
+      "question": "how do i add 7tv to my twitch chat",
+      "ok": false,
+      "note": "not routed to the web (topic=twitch_other, kind=answer)",
+      "kind": "answer",
+      "tool": null,
+      "seconds": 10.8,
+      "answer": "I couldn't reach the web just now to look that up (the search service didn't answer). Try again in a moment. I can still count clips, show top clips, or search what was said in transcribed clips."
+    },
+    {
+      "id": "h10",
+      "question": "find clips where jasontheween talks about gta",
+      "ok": true,
+      "note": "2 of the top 5 clips match /\\bgta\\b/",
+      "kind": "answer",
+      "tool": "search_clips",
+      "seconds": 8.2,
+      "answer": "There are no clips that mention GTA. Clip [4] mentions a \"GTA role player\" but it's referring to someone named Guapo, not Jasontheween."
+    },
+    {
+      "id": "h11",
+      "question": "when did jason go to nyc",
+      "ok": false,
+      "note": "0 of the top 5 clips match /\\bnyc\\b|new york/",
+      "kind": "answer",
+      "tool": "search_clips",
+      "seconds": 2.3,
+      "answer": "I haven't transcribed Jason's clips, so I can't search by topic for them. I can still count their clips or show their top clips."
+    },
+    {
+      "id": "h12",
+      "question": "clips of arky cooking",
+      "ok": true,
+      "note": "1 of the top 5 clips match /\\bcook/",
+      "kind": "answer",
+      "tool": "search_clips",
+      "seconds": 4.3,
+      "answer": "There are two clips related to Arky cooking:\n\n[2] clip date 2025-12-07, title: arky drool \ud83d\ude3b\ud83d\ude3b. Transcript: ...I'm pulling the fuck out of the chicken... That's fucking why I dip shit\n\n[5] clip date 2025-11-27, title: This bird died in vain. Transcript: It's frozen, it's fucking flat... I'm pulling th"
+    },
+    {
+      "id": "h13",
+      "question": "what's the capital of japan",
+      "ok": true,
+      "note": "kind=refusal",
+      "kind": "refusal",
+      "tool": null,
+      "seconds": 0.6,
+      "answer": "This isn't Twitch related, so I can't help with that. I can answer questions about streamers and their clips."
+    },
+    {
+      "id": "h14",
+      "question": "how do i fix my laptop wifi",
+      "ok": true,
+      "note": "kind=refusal",
+      "kind": "refusal",
+      "tool": null,
+      "seconds": 0.4,
+      "answer": "This isn't Twitch related, so I can't help with that. I can answer questions about streamers and their clips."
+    },
+    {
+      "id": "h15",
+      "question": "show me clips about poker from arky",
+      "ok": true,
+      "note": "confident=False",
+      "kind": "answer",
+      "tool": "search_clips",
+      "seconds": 1.7,
+      "answer": "I could not find anything about this: no transcribed clip mentions 'poker'. These are the closest clips by meaning, but they probably do not match. Only top clips from 2026 are transcribed."
+    },
+    {
+      "id": "h16",
+      "question": "top 3 clips from jasontheween on christmas day 2025",
+      "ok": true,
+      "note": "range=None confident=False: I could not run that: could not understand date phrase: Christmas Day 2025",
+      "kind": "answer",
+      "tool": "top_clips",
+      "seconds": 2.0,
+      "answer": "I could not run that: could not understand date phrase: Christmas Day 2025"
+    }
+  ]
+}

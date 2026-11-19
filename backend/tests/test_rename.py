@@ -61,3 +61,27 @@ def test_resolving_a_known_streamer_picks_up_a_new_name_and_checks_only_hourly(t
     assert streamers.resolve(svc, "yugi")["streamer"].login == "yugi2x"
     streamers.resolve(svc, "yugi2x")
     assert fake.calls == 1
+
+
+def make_known(tmp_path, *logins):
+    store = Store(tmp_path / "t.db")
+    for i, login in enumerate(logins):
+        store.upsert_streamer(user(login, str(i + 1)))
+    return Services(store, None, None)
+
+
+def test_a_nickname_resolves_to_the_one_known_streamer_it_starts(tmp_path):
+    svc = make_known(tmp_path, "jasontheween", "ludwig")
+    res = streamers.resolve(svc, "jason")
+    assert res["status"] == "ok" and res["streamer"].login == "jasontheween" and res["alias_of"] == "jason"
+
+
+def test_an_ambiguous_or_too_short_nickname_is_not_guessed(tmp_path):
+    svc = make_known(tmp_path, "jasontheween", "jasonbourne")
+    assert streamers.resolve(svc, "jason")["status"] == "unknown"
+    assert streamers.resolve(make_known(tmp_path / "x" if False else tmp_path, "ludwig"), "lud")["status"] == "unknown"
+
+
+def test_an_old_name_after_a_rename_still_finds_the_streamer(tmp_path):
+    svc = make_known(tmp_path, "yugi2x")
+    assert streamers.resolve(svc, "yugi")["streamer"].login == "yugi2x"

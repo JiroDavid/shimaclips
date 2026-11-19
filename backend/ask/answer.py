@@ -169,6 +169,8 @@ def _web_flow(svc: Services, question: str, default_login: str | None, out: dict
     if res is not None and res["status"] == "ok":
         streamer = res["streamer"]
         out["streamer"] = public(streamer)
+        if res.get("alias_of"):
+            out["note"] = f"I took '{res['alias_of']}' to mean {streamer.display_name}."
         conn = open_readonly(svc.db_path)
         try:
             _top_clips_context(svc, conn, out, streamer, today)
@@ -387,6 +389,8 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
             return finish()
         streamer = res["streamer"]
         out["streamer"] = public(streamer)
+        if res.get("alias_of"):
+            out["note"] = f"I took '{res['alias_of']}' to mean {streamer.display_name}."
         conn = open_readonly(svc.db_path)
         try:
             _run_tool(svc, conn, out, usage, question, routed["tool"], args, streamer, today)

@@ -80,6 +80,16 @@ def _refreshed(svc: Services, streamer: Streamer) -> Streamer:
     return svc.store.get_streamer(user.login) or streamer
 
 
+MIN_ALIAS = 4
+
+
+def _alias(svc: Services, login: str) -> Streamer | None:
+    if len(login) < MIN_ALIAS:
+        return None
+    matches = [known for known in svc.store.known_logins() if known.startswith(login)]
+    return svc.store.get_streamer(matches[0]) if len(matches) == 1 else None
+
+
 def resolve(svc: Services, name: str) -> dict:
     login = clean_login(name)
     if not 1 <= len(login) <= 25:
@@ -87,6 +97,9 @@ def resolve(svc: Services, name: str) -> dict:
     known = svc.store.get_streamer(login)
     if known is not None:
         return {"status": "ok", "streamer": _refreshed(svc, known)}
+    alias = _alias(svc, login)
+    if alias is not None:
+        return {"status": "ok", "streamer": alias, "alias_of": login}
     if svc.twitch is None:
         return {"status": "unknown", "name": name, "suggestions": []}
     try:
