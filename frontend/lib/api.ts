@@ -251,6 +251,18 @@ export type AskMonth = {
   clips: Clip[];
 };
 
+export type TranscriptionState = "idle" | "queued" | "finding" | "transcribing" | "indexing" | "done" | "error";
+
+export type Transcription = {
+  login: string;
+  display_name: string;
+  state: TranscriptionState;
+  total: number;
+  processed: number;
+  transcribed: number;
+  error: string | null;
+};
+
 export type WebSource = { n: number; title: string; url: string; domain: string };
 
 export type AskResult = {
@@ -265,6 +277,7 @@ export type AskResult = {
   sources: AskSource[];
   web_sources?: WebSource[];
   web?: { cached: boolean; seconds: number };
+  transcription?: Transcription;
   months: AskMonth[];
   confident: boolean;
   usage: { prompt_tokens: number; output_tokens: number };
@@ -304,4 +317,16 @@ export async function getConversation(id: string): Promise<Conversation> {
 export async function deleteConversation(id: string): Promise<void> {
   const r = await fetch(`${API}/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!r.ok) throw new Error(await errorMessage(r));
+}
+
+export async function getTranscription(login: string): Promise<Transcription> {
+  const r = await fetch(`${API}/api/streamers/${encodeURIComponent(login)}/transcribe`);
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return r.json();
+}
+
+export async function startTranscription(login: string): Promise<Transcription> {
+  const r = await fetch(`${API}/api/streamers/${encodeURIComponent(login)}/transcribe`, { method: "POST" });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return r.json();
 }

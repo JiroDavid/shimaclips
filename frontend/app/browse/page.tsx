@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Logo from "@/components/Logo";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import ClipPreview, { PreviewContext } from "@/components/ClipPreview";
@@ -134,7 +135,10 @@ function Browse() {
     <PreviewContext.Provider value={preview}>
       <main className="mx-auto max-w-6xl space-y-6 p-6">
         <div className="flex items-baseline justify-between gap-3">
-          <h1 className="text-2xl font-bold">Shimaclips</h1>
+          <Link href="/" aria-label="Shimaclips, back to the front page" className="flex items-center gap-3 rounded-lg hover:opacity-80">
+            <Logo className="h-10 w-10" />
+            <h1 className="text-2xl font-bold">Shimaclips</h1>
+          </Link>
           <Link href="/" className="text-sm text-zinc-400 underline hover:text-zinc-200">
             Ask about clips
           </Link>

@@ -7,6 +7,7 @@ import ClipPreview, { PreviewContext } from "@/components/ClipPreview";
 import DownloadPanel from "@/components/DownloadPanel";
 import Logo from "@/components/Logo";
 import Sidebar from "@/components/Sidebar";
+import TranscriptionProgress from "@/components/TranscriptionProgress";
 import {
   askQuestion,
   deleteConversation,
@@ -33,6 +34,15 @@ const FIELD = "border border-zinc-700 bg-zinc-900 outline-none focus:border-zinc
 const INK_BUTTON = "bg-zinc-100 text-zinc-900 hover:bg-white disabled:opacity-40";
 
 type Turn = { id: number; question: string; result: AskResult | null; error: string | null };
+
+function safeHref(url: string): string | undefined {
+  try {
+    const u = new URL(url);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function monthLabel(key: string): string {
   const [y, m] = key.split("-").map(Number);
@@ -121,6 +131,13 @@ function Answer({
           <>
             <p className="whitespace-pre-wrap text-base leading-relaxed">{r.answer}</p>
             {r.note && <p className="text-sm text-amber-400">{r.note}</p>}
+            {r.transcription && (
+              <TranscriptionProgress
+                key={r.transcription.login}
+                initial={r.transcription}
+                onSearchAgain={() => onPick(r.transcription!.login, turn.question)}
+              />
+            )}
             {r.web_sources && r.web_sources.length > 0 && (
               <div className="space-y-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3">
                 <p className={LABEL}>Sources from the web</p>
@@ -128,9 +145,13 @@ function Answer({
                   {r.web_sources.map((w) => (
                     <li key={w.n} className="truncate">
                       <span className="text-zinc-500">[{w.n}] </span>
-                      <a href={w.url} target="_blank" rel="noreferrer" className="underline hover:text-zinc-50">
-                        {w.title || w.domain}
-                      </a>
+                      {safeHref(w.url) ? (
+                        <a href={safeHref(w.url)} target="_blank" rel="noreferrer" className="underline hover:text-zinc-50">
+                          {w.title || w.domain}
+                        </a>
+                      ) : (
+                        <span>{w.title || w.domain}</span>
+                      )}
                       <span className="text-zinc-500"> - {w.domain}</span>
                     </li>
                   ))}
