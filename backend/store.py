@@ -185,6 +185,10 @@ class Store:
             [(user.id, user.login, user.display_name, _enc(user.created_at))],
         )
 
+    def known_logins(self) -> list[str]:
+        with closing(self._connect()) as conn:
+            return [r[0] for r in conn.execute("SELECT login FROM streamers")]
+
     def get_streamer(self, login: str) -> Streamer | None:
         with closing(self._connect()) as conn:
             r = conn.execute(

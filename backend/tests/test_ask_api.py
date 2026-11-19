@@ -1,25 +1,43 @@
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import main
 from ask import api
 
 
-def test_ask_rejects_bad_login():
-    r = TestClient(main.app).post("/api/ask", json={"question": "how many clips", "login": "../etc"})
-    assert r.status_code == 422
-
-
-def test_ask_rejects_short_question():
-    r = TestClient(main.app).post("/api/ask", json={"question": "hi", "login": "jay"})
-    assert r.status_code == 422
-
-
-def test_ask_returns_result_and_logs(monkeypatch, tmp_path):
+def client(monkeypatch, tmp_path, result=None):
     monkeypatch.setattr(api, "LOG_PATH", tmp_path / "log.jsonl")
-    monkeypatch.setattr(api, "open_readonly", lambda _p: type("C", (), {"close": lambda self: None})())
-    fake = {"question": "q", "tool": "count_clips", "args": {}, "confident": True,
-            "usage": {"prompt_tokens": 1, "output_tokens": 1}, "seconds": 0.1, "answer": "x", "sources": []}
-    monkeypatch.setattr(api, "ask", lambda *_a, **_k: fake)
-    r = TestClient(main.app).post("/api/ask", json={"question": "how many clips", "login": "Jay"})
-    assert r.status_code == 200 and r.json()["answer"] == "x"
-    assert (tmp_path / "log.jsonl").read_text().count("\n") == 1
+    fake = result or {"question": "q", "kind": "answer", "tool": "count_clips", "args": {}, "confident": True,
+                      "usage": {"prompt_tokens": 1, "output_tokens": 1}, "seconds": 0.1, "answer": "x"}
+    seen = {}
+
+    def fake_ask(svc, question, login):
+        seen["login"] = login
+        return fake
+
+    monkeypatch.setattr(api, "ask", fake_ask)
+    app = FastAPI()
+    app.include_router(api.make_router(lambda: object(), lambda: object(), lambda: None))
+    return TestClient(app), seen
+
+
+def test_rejects_bad_login(monkeypatch, tmp_path):
+    c, _ = client(monkeypatch, tmp_path)
+    assert c.post("/api/ask", json={"question": "how many clips", "login": "../etc"}).status_code == 422
+
+
+def test_rejects_short_question(monkeypatch, tmp_path):
+    c, _ = client(monkeypatch, tmp_path)
+    assert c.post("/api/ask", json={"question": "hi"}).status_code == 422
+
+
+def test_login_is_optional_and_normalised(monkeypatch, tmp_path):
+    c, seen = client(monkeypatch, tmp_path)
+    assert c.post("/api/ask", json={"question": "how many clips"}).status_code == 200 and seen["login"] is None
+    c.post("/api/ask", json={"question": "how many clips", "login": " Jay "})
+    assert seen["login"] == "jay"
+
+
+def test_result_is_returned_and_logged(monkeypatch, tmp_path):
+    c, _ = client(monkeypatch, tmp_path)
+    r = c.post("/api/ask", json={"question": "how many clips"})
+    assert r.json()["answer"] == "x" and (tmp_path / "log.jsonl").read_text().count("\n") == 1

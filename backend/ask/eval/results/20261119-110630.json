@@ -1,0 +1,1125 @@
+{
+  "ran_at": "2026-11-19 11:04:49",
+  "today": "2026-11-19",
+  "structured": [
+    {
+      "id": "s01",
+      "question": "How many clips does he have this month?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "streamer": "jasontheween",
+        "when": "this month"
+      },
+      "usage": {
+        "prompt_tokens": 1078,
+        "output_tokens": 37
+      },
+      "seconds": 8.52
+    },
+    {
+      "id": "s02",
+      "question": "How many clips did he get last month?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "streamer": "jasontheween",
+        "when": "last month"
+      },
+      "usage": {
+        "prompt_tokens": 1078,
+        "output_tokens": 37
+      },
+      "seconds": 1.49
+    },
+    {
+      "id": "s03",
+      "question": "How many clips did he get in 2025?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "streamer": "jasontheween",
+        "when": "2025"
+      },
+      "usage": {
+        "prompt_tokens": 1082,
+        "output_tokens": 37
+      },
+      "seconds": 1.89
+    },
+    {
+      "id": "s04",
+      "question": "How many clips in March 2026?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "streamer": "jasontheween",
+        "when": "March 2026"
+      },
+      "usage": {
+        "prompt_tokens": 1078,
+        "output_tokens": 39
+      },
+      "seconds": 1.47
+    },
+    {
+      "id": "s05",
+      "question": "How many clips were made yesterday?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "when": "yesterday"
+      },
+      "usage": {
+        "prompt_tokens": 1074,
+        "output_tokens": 27
+      },
+      "seconds": 1.24
+    },
+    {
+      "id": "s06",
+      "question": "How many clips did ludwig get in 2024?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "streamer": "ludwig",
+        "when": "2024"
+      },
+      "usage": {
+        "prompt_tokens": 1084,
+        "output_tokens": 36
+      },
+      "seconds": 1.41
+    },
+    {
+      "id": "s07",
+      "question": "What are the top 10 clips this month?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "this month",
+        "limit": "10",
+        "sort": "views",
+        "streamer": "jasontheween"
+      },
+      "usage": {
+        "prompt_tokens": 1080,
+        "output_tokens": 49
+      },
+      "seconds": 1.73
+    },
+    {
+      "id": "s08",
+      "question": "Show me the top 5 clips last week",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "last week",
+        "limit": "5"
+      },
+      "usage": {
+        "prompt_tokens": 1078,
+        "output_tokens": 33
+      },
+      "seconds": 1.44
+    },
+    {
+      "id": "s09",
+      "question": "Most viewed clips of 2025",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "streamer": "jasontheween",
+        "limit": "10",
+        "sort": "views",
+        "when": "2025"
+      },
+      "usage": {
+        "prompt_tokens": 1074,
+        "output_tokens": 49
+      },
+      "seconds": 3.76
+    },
+    {
+      "id": "s10",
+      "question": "Show the 3 newest clips from October 2026",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "October 2026",
+        "limit": "3",
+        "sort": "newest"
+      },
+      "usage": {
+        "prompt_tokens": 1082,
+        "output_tokens": 42
+      },
+      "seconds": 1.7
+    },
+    {
+      "id": "s11",
+      "question": "Give me the 20 most viewed clips in January 2026",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "January 2026",
+        "limit": "20",
+        "sort": "views"
+      },
+      "usage": {
+        "prompt_tokens": 1086,
+        "output_tokens": 41
+      },
+      "seconds": 1.62
+    },
+    {
+      "id": "s12",
+      "question": "Top 3 clips this week",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "3",
+        "sort": "views",
+        "streamer": "jasontheween",
+        "when": "this week"
+      },
+      "usage": {
+        "prompt_tokens": 1072,
+        "output_tokens": 49
+      },
+      "seconds": 1.62
+    },
+    {
+      "id": "h01",
+      "question": "how many clips did he get in the past 30 days?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "streamer": "jasontheween",
+        "when": "past 30 days"
+      },
+      "usage": {
+        "prompt_tokens": 1086,
+        "output_tokens": 39
+      },
+      "seconds": 1.5
+    },
+    {
+      "id": "h02",
+      "question": "how many clips in the month before last",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "when": "month before last"
+      },
+      "usage": {
+        "prompt_tokens": 1076,
+        "output_tokens": 28
+      },
+      "seconds": 1.29
+    },
+    {
+      "id": "h03",
+      "question": "how mny clips did he get in Octobr",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "streamer": "jasontheween",
+        "when": "October"
+      },
+      "usage": {
+        "prompt_tokens": 1082,
+        "output_tokens": 36
+      },
+      "seconds": 1.39
+    },
+    {
+      "id": "h04",
+      "question": "top 5 most watched clips from September",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "September",
+        "limit": "5",
+        "sort": "views"
+      },
+      "usage": {
+        "prompt_tokens": 1076,
+        "output_tokens": 38
+      },
+      "seconds": 1.65
+    },
+    {
+      "id": "h05",
+      "question": "what is his biggest clip of 2026",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "this year",
+        "streamer": "jasontheween",
+        "limit": "1",
+        "sort": "views"
+      },
+      "usage": {
+        "prompt_tokens": 1078,
+        "output_tokens": 49
+      },
+      "seconds": 3.81
+    },
+    {
+      "id": "h06",
+      "question": "how many clips were made on 2026-11-10",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "streamer": "jasontheween",
+        "when": "2026-11-10"
+      },
+      "usage": {
+        "prompt_tokens": 1086,
+        "output_tokens": 41
+      },
+      "seconds": 1.72
+    },
+    {
+      "id": "h07",
+      "question": "top 10 clips in the last 7 days",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "last 7 days",
+        "limit": "10"
+      },
+      "usage": {
+        "prompt_tokens": 1080,
+        "output_tokens": 35
+      },
+      "seconds": 1.37
+    },
+    {
+      "id": "h08",
+      "question": "number of clips last year",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "when": "last year"
+      },
+      "usage": {
+        "prompt_tokens": 1070,
+        "output_tokens": 27
+      },
+      "seconds": 1.24
+    },
+    {
+      "id": "h09",
+      "question": "which clips got the most views in Feb 2026? just 4",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "when": "Feb 2026",
+        "limit": "4"
+      },
+      "usage": {
+        "prompt_tokens": 1090,
+        "output_tokens": 35
+      },
+      "seconds": 1.38
+    },
+    {
+      "id": "h10",
+      "question": "count his clips for this year",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "when": "this year"
+      },
+      "usage": {
+        "prompt_tokens": 1072,
+        "output_tokens": 27
+      },
+      "seconds": 1.25
+    }
+  ],
+  "retrieval": {
+    "title_embed": {
+      "hit@5": 0.667,
+      "precision@5": 0.417,
+      "mrr": 0.667
+    },
+    "transcript_embed": {
+      "hit@5": 0.667,
+      "precision@5": 0.533,
+      "mrr": 0.667
+    },
+    "keyword": {
+      "hit@5": 1.0,
+      "precision@5": 0.9,
+      "mrr": 1.0
+    },
+    "hybrid": {
+      "hit@5": 1.0,
+      "precision@5": 0.733,
+      "mrr": 0.875
+    }
+  },
+  "retrieval_detail": [
+    {
+      "id": "q01",
+      "n_relevant": 41,
+      "title_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "q02",
+      "n_relevant": 15,
+      "title_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "q03",
+      "n_relevant": 19,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.4
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.8
+      }
+    },
+    {
+      "id": "q04",
+      "n_relevant": 35,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "q05",
+      "n_relevant": 36,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.4
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "q06",
+      "n_relevant": 17,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.2
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 0.2
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 0.2
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    },
+    {
+      "id": "q07",
+      "n_relevant": 13,
+      "title_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "transcript_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    },
+    {
+      "id": "q08",
+      "n_relevant": 10,
+      "title_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "transcript_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    },
+    {
+      "id": "q09",
+      "n_relevant": 44,
+      "title_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "transcript_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    },
+    {
+      "id": "q10",
+      "n_relevant": 16,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.8
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "m01",
+      "n_relevant": 35,
+      "title_embed": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "transcript_embed": {
+        "hit": true,
+        "p5": 0.6
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 1.0
+      }
+    },
+    {
+      "id": "m02",
+      "n_relevant": 11,
+      "title_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "transcript_embed": {
+        "hit": false,
+        "p5": 0.0
+      },
+      "keyword": {
+        "hit": true,
+        "p5": 1.0
+      },
+      "hybrid": {
+        "hit": true,
+        "p5": 0.4
+      }
+    }
+  ],
+  "pipeline_semantic": [
+    {
+      "id": "q01",
+      "question": "Find clips where he talks about boxing",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "Clips [1], [2], and [4] mention boxing.\n\n[1]: Ricegum mentions fighting Alex Wasabi in a boxing match.\n[2]: Julia is asked if she would be down to fight in NMS Boxing, and she agrees.\n[4]: Jason (presumably the streamer) announces that he will be boxing Ryan Garcia.\n\nThe cited clips were made on or between 2026-04-07 and 2026-10-18. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1638,
+        "output_tokens": 110
+      },
+      "seconds": 4.8
+    },
+    {
+      "id": "q02",
+      "question": "Find clips about resident evil",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "Clips [1], [2], [3], and [5] mention \"Resident Evil\". Clip [4] mentions a game called \"Resident Evil Biohazard\", which is likely referring to the same franchise.\n\nThe cited clips were made on or between 2026-07-29 and 2026-08-07. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1458,
+        "output_tokens": 84
+      },
+      "seconds": 2.88
+    },
+    {
+      "id": "q03",
+      "question": "Find clips where he goes fishing",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 4,
+      "cited": 5,
+      "answer": "Clips [1], [2], and [4] mention fishing. Clip [3] does not appear to be related to fishing, but rather a transition to a special guest segment.\n\nThe cited clips were made on or between 2026-02-17 and 2026-06-26. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1567,
+        "output_tokens": 77
+      },
+      "seconds": 2.84
+    },
+    {
+      "id": "q04",
+      "question": "What happened on the island stream?",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "The clips do not provide a comprehensive answer to what happened on the island stream beyond Jason being stranded for 7 days and receiving donations from viewers. They mention specific events such as QT donating $3.00, but they do not describe the overall experience or any notable challenges faced by Jason.\n\nThe cited clips were made on or between 2026-02-15 and 2026-02-21. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1640,
+        "output_tokens": 97
+      },
+      "seconds": 3.19
+    },
+    {
+      "id": "q05",
+      "question": "Find clips about someone's birthday",
+      "tool": null,
+      "tool_ok": false,
+      "confident": false,
+      "cited_relevant": 0,
+      "cited": 0,
+      "answer": "I could not work out how to answer that with the clip library.",
+      "usage": {
+        "prompt_tokens": 1072,
+        "output_tokens": 38
+      },
+      "seconds": 1.42
+    },
+    {
+      "id": "q06",
+      "question": "Find clips where he is on a facetime call",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 2,
+      "cited": 5,
+      "answer": "Clips [1] and [4] mention Jason being on a FaceTime call. Clip [1] shows Jason trying to avoid his aunt's FaceTime call, while clip [4] shows Ellysa attempting to reach Jason via FaceTime.\n\nThe cited clips were made on or between 2026-06-28 and 2026-10-21. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1686,
+        "output_tokens": 94
+      },
+      "seconds": 3.15
+    },
+    {
+      "id": "q07",
+      "question": "Find clips about New York",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 2,
+      "cited": 5,
+      "answer": "Clips [2], [4] mention New York. Clip [2] has the streamer expressing their love for New York and describing it as \"hectic\". Clip [4] has the streamer saying they love New York and calling it a \"superhero\".\n\nThe cited clips were made on or between 2026-02-20 and 2026-09-14. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1351,
+        "output_tokens": 93
+      },
+      "seconds": 2.97
+    },
+    {
+      "id": "q08",
+      "question": "Find clips where he talks about Japan",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 2,
+      "cited": 5,
+      "answer": "Clips [2], [4] mention Japan.\n\nThe cited clips were made on or between 2026-02-16 and 2026-11-05. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1375,
+        "output_tokens": 48
+      },
+      "seconds": 2.3
+    },
+    {
+      "id": "q09",
+      "question": "Find clips with Lacy",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 2,
+      "cited": 5,
+      "answer": "Clips [2], [4] mention \"Lacy\".\n\nThe cited clips were made on or between 2026-01-13 and 2026-06-13. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1294,
+        "output_tokens": 51
+      },
+      "seconds": 2.23
+    },
+    {
+      "id": "q10",
+      "question": "Who is burger?",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "The clips don't clearly answer who \"burger\" is. They mention a person named Burger getting loud [2], being referred to by the streamer [3], and having a basket [4]. However, there is no direct information about who or what \"burger\" refers to.\n\nThe cited clips were made on or between 2026-05-26 and 2026-10-18. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1557,
+        "output_tokens": 94
+      },
+      "seconds": 3.07
+    }
+  ],
+  "pipeline_mixed": [
+    {
+      "id": "m01",
+      "question": "When did he do his island stream?",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 5,
+      "cited": 5,
+      "answer": "The clips don't explicitly state when Jason started his island stream, only that it ended on February 21, 2026.\n\nThe cited clips were made on or between 2026-02-15 and 2026-02-21. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1643,
+        "output_tokens": 65
+      },
+      "seconds": 2.66,
+      "cited_in_window": 5
+    },
+    {
+      "id": "m02",
+      "question": "When was the World Cup mentioned?",
+      "tool": null,
+      "tool_ok": false,
+      "confident": false,
+      "cited_relevant": 0,
+      "cited": 0,
+      "answer": "This isn't Twitch related, so I can't help with that. I can answer questions about streamers and their clips.",
+      "usage": {
+        "prompt_tokens": 344,
+        "output_tokens": 8
+      },
+      "seconds": 0.48,
+      "cited_in_window": 0
+    }
+  ],
+  "pipeline_abstain": [
+    {
+      "id": "a01",
+      "question": "Find clips where he talks about chess",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": true,
+      "cited_relevant": 2,
+      "cited": 5,
+      "answer": "[1] and [2] mention chess. In [1], he says \"He said he wanted a 1v1 and chess\". In [2], he says \"You love long watch walks on the beach and that you're gonna help them play chess.\"\n\nThe cited clips were made on or between 2026-04-07 and 2026-11-05. A clip date is when the clip was made, not necessarily when the stream happened.",
+      "usage": {
+        "prompt_tokens": 1660,
+        "output_tokens": 92
+      },
+      "seconds": 3.03,
+      "abstained": false
+    },
+    {
+      "id": "a02",
+      "question": "Find clips where he plays poker",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": false,
+      "cited_relevant": 0,
+      "cited": 5,
+      "answer": "I could not find anything about this: no transcribed clip mentions 'poker'. These are the closest clips by meaning, but they probably do not match. Only top clips from 2026 are transcribed.",
+      "usage": {
+        "prompt_tokens": 1072,
+        "output_tokens": 38
+      },
+      "seconds": 1.83,
+      "abstained": true
+    },
+    {
+      "id": "a03",
+      "question": "Find clips about his trip to Florida",
+      "tool": "search_clips",
+      "tool_ok": true,
+      "confident": false,
+      "cited_relevant": 0,
+      "cited": 5,
+      "answer": "I could not find anything about this: no transcribed clip mentions 'florida'. These are the closest clips by meaning, but they probably do not match. Only top clips from 2026 are transcribed.",
+      "usage": {
+        "prompt_tokens": 1074,
+        "output_tokens": 39
+      },
+      "seconds": 1.88,
+      "abstained": true
+    }
+  ],
+  "guard": [
+    {
+      "question": "top 10 clips for jasontheween this month",
+      "want": "clips",
+      "got": "clips",
+      "ok": true
+    },
+    {
+      "question": "how many clips did stableronaldo get in 2025",
+      "want": "clips",
+      "got": "clips",
+      "ok": true
+    },
+    {
+      "question": "clips of him cooking",
+      "want": "clips",
+      "got": "clips",
+      "ok": true
+    },
+    {
+      "question": "who is burger? jasontheween stableronaldo",
+      "want": "clips",
+      "got": "clips",
+      "ok": true
+    },
+    {
+      "question": "who is jasontheween's girlfriend",
+      "want": "clips",
+      "got": "clips",
+      "ok": true
+    },
+    {
+      "question": "what did he say about the nba",
+      "want": "clips",
+      "got": "clips",
+      "ok": true
+    },
+    {
+      "question": "find clips where he talks about boxing",
+      "want": "clips",
+      "got": "clips",
+      "ok": true
+    },
+    {
+      "question": "hey im making a 2026 rewind video for jasontheween, could you get the top 10 clips for each month?",
+      "want": "clips",
+      "got": "clips",
+      "ok": true
+    },
+    {
+      "question": "when did he do his island stream",
+      "want": "clips",
+      "got": "clips",
+      "ok": true
+    },
+    {
+      "question": "did jasontheween win an award in streamer awards?",
+      "want": "twitch_other",
+      "got": "twitch_other",
+      "ok": true
+    },
+    {
+      "question": "is stableronaldo in the top 100 streamers this year",
+      "want": "twitch_other",
+      "got": "twitch_other",
+      "ok": true
+    },
+    {
+      "question": "what are 7tv emotes?",
+      "want": "twitch_other",
+      "got": "twitch_other",
+      "ok": true
+    },
+    {
+      "question": "how do I become a twitch affiliate",
+      "want": "twitch_other",
+      "got": "twitch_other",
+      "ok": true
+    },
+    {
+      "question": "what is the best software for streaming",
+      "want": "twitch_other",
+      "got": "twitch_other",
+      "ok": true
+    },
+    {
+      "question": "what twitch extensions are popular right now",
+      "want": "twitch_other",
+      "got": "twitch_other",
+      "ok": true
+    },
+    {
+      "question": "who is the most followed streamer on twitch",
+      "want": "twitch_other",
+      "got": "twitch_other",
+      "ok": true
+    },
+    {
+      "question": "who won the nba finals",
+      "want": "off_topic",
+      "got": "off_topic",
+      "ok": true
+    },
+    {
+      "question": "give me a recipe for carbonara",
+      "want": "off_topic",
+      "got": "off_topic",
+      "ok": true
+    },
+    {
+      "question": "write a python function that reverses a string",
+      "want": "off_topic",
+      "got": "off_topic",
+      "ok": true
+    },
+    {
+      "question": "what is the capital of france",
+      "want": "off_topic",
+      "got": "off_topic",
+      "ok": true
+    },
+    {
+      "question": "what is 17 times 23",
+      "want": "off_topic",
+      "got": "off_topic",
+      "ok": true
+    },
+    {
+      "question": "who is the president of the united states",
+      "want": "off_topic",
+      "got": "off_topic",
+      "ok": true
+    }
+  ],
+  "routing": [
+    {
+      "question": "hey im making a 2026 rewind video for jasontheween, could you retrieve the top 10 clips for each month this year?",
+      "want_tool": "top_clips_by_month",
+      "got_tool": "top_clips_by_month",
+      "want_streamer": "jasontheween",
+      "got_streamer": "jasontheween",
+      "ok": true
+    },
+    {
+      "question": "top 10 clips for each month of 2025 for stableronaldo",
+      "want_tool": "top_clips_by_month",
+      "got_tool": "top_clips_by_month",
+      "want_streamer": "stableronaldo",
+      "got_streamer": "stableronaldo",
+      "ok": true
+    },
+    {
+      "question": "how many clips did ludwig get in 2024",
+      "want_tool": "count_clips",
+      "got_tool": "count_clips",
+      "want_streamer": "ludwig",
+      "got_streamer": "ludwig",
+      "ok": true
+    },
+    {
+      "question": "top 5 clips this week from arky",
+      "want_tool": "top_clips",
+      "got_tool": "top_clips",
+      "want_streamer": "arky",
+      "got_streamer": "arky",
+      "ok": true
+    },
+    {
+      "question": "who is burger? jasontheween",
+      "want_tool": "search_clips",
+      "got_tool": "search_clips",
+      "want_streamer": "jasontheween",
+      "got_streamer": "jasontheween",
+      "ok": true
+    },
+    {
+      "question": "find clips where he talks about boxing",
+      "want_tool": "search_clips",
+      "got_tool": "search_clips",
+      "want_streamer": null,
+      "got_streamer": "jasontheween",
+      "ok": false
+    },
+    {
+      "question": "how many clips this month",
+      "want_tool": "count_clips",
+      "got_tool": "count_clips",
+      "want_streamer": null,
+      "got_streamer": null,
+      "ok": true
+    },
+    {
+      "question": "when did marlon go to new york",
+      "want_tool": "search_clips",
+      "got_tool": "search_clips",
+      "want_streamer": "marlon",
+      "got_streamer": "marlon",
+      "ok": true
+    },
+    {
+      "question": "tell me about yugi's channel",
+      "want_tool": "streamer_info",
+      "got_tool": "streamer_info",
+      "want_streamer": "yugi",
+      "got_streamer": "yugi",
+      "ok": true
+    },
+    {
+      "question": "top clips of all time for @shroud",
+      "want_tool": "top_clips",
+      "got_tool": "top_clips",
+      "want_streamer": "shroud",
+      "got_streamer": "shroud",
+      "ok": true
+    }
+  ]
+}

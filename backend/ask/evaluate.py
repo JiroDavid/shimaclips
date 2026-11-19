@@ -8,7 +8,11 @@ from ask.answer import ask
 from ask.embed import embed_query
 from ask.keyword import fuse, keyword_search
 from ask.retrieve import load_matrix, top_k
+from ask.guard import classify
 from ask.router import route
+from ask.services import Services
+from ask.streamers import clean_login, mentioned
+from store import Store
 from ask.tools import open_readonly
 
 HERE = Path(__file__).parent
@@ -36,11 +40,11 @@ def expected_top_views(conn, login, start, end, limit, sort) -> list[int]:
     return [r[0] for r in rows]
 
 
-def run_structured(conn, cases, default_login, today):
+def run_structured(conn, svc, cases, default_login, today):
     results = []
     for c in cases:
         login = c.get("login", default_login)
-        r = ask(conn, c["question"], default_login, today)
+        r = ask(svc, c["question"], default_login, today)
         data = r.get("data") or {}
         tool_ok = r["tool"] == c["tool"]
         args_ok = data.get("start") == c["start"] and data.get("end") == c["end"] and data.get("login") == login
@@ -101,10 +105,10 @@ def run_retrieval(conn, entries):
     return summary, detail
 
 
-def run_pipeline(conn, entries, login, today, kind):
+def run_pipeline(conn, svc, entries, login, today, kind):
     out = []
     for e in entries:
-        r = ask(conn, e["question"], login, today)
+        r = ask(svc, e["question"], login, today)
         rel = set(e.get("relevant", []))
         cited = [s["id"] for s in r["sources"]]
         row = {"id": e["id"], "question": e["question"], "tool": r["tool"], "tool_ok": r["tool"] == "search_clips",
@@ -119,12 +123,34 @@ def run_pipeline(conn, entries, login, today, kind):
     return out
 
 
+def run_guard(cases, default_login):
+    from ask.guard import SYSTEM
+    rows = []
+    for c in cases:
+        label, _ = classify(c["question"], default_login)
+        rows.append({"question": c["question"], "want": c["label"], "got": label, "ok": label == c["label"],
+                     "in_prompt": c["question"].lower() in SYSTEM.lower()})
+    return rows
+
+
+def run_routing(cases, svc):
+    rows = []
+    for c in cases:
+        r = route(c["question"], c["default"])
+        got = r["args"].get("streamer")
+        got = clean_login(str(got)) if got else None
+        rows.append({"question": c["question"], "want_tool": c["tool"], "got_tool": r["tool"], "want_streamer": c["streamer"],
+                     "got_streamer": got, "with_safety_net": (got or mentioned(svc, c["question"])) == c["streamer"] or (c["streamer"] is None and (got or mentioned(svc, c["question"]) or c["default"]) == c["default"]) and r["tool"] == c["tool"], "ok": r["tool"] == c["tool"] and (got == c["streamer"] or (c["streamer"] is None and got == c["default"]))})
+    return rows
+
+
 def main() -> None:
     golden = json.loads((HERE / "eval" / "golden.json").read_text())
     today = date.fromisoformat(golden["today"])
     conn = open_readonly(DB)
+    svc = Services(Store(DB), None, None)
     out: dict = {"ran_at": time.strftime("%Y-%m-%d %H:%M:%S"), "today": golden["today"]}
-    structured = run_structured(conn, golden["structured"], golden["login"], today)
+    structured = run_structured(conn, svc, golden["structured"], golden["login"], today)
     out["structured"] = structured
     passed = sum(r["passed"] for r in structured)
     print(f"structured: {passed}/{len(structured)} exact")
@@ -138,10 +164,23 @@ def main() -> None:
     for m, v in summary.items():
         print(f"  {m:17} hit@5 {v['hit@5']:.2f}  precision@5 {v['precision@5']:.2f}  mrr {v['mrr']:.2f}")
     for kind in ("semantic", "mixed", "abstain"):
-        res = run_pipeline(conn, golden[kind], golden["login"], today, kind)
+        res = run_pipeline(conn, svc, golden[kind], golden["login"], today, kind)
         out["pipeline_" + kind] = res
         print(kind, "tool ok", sum(r["tool_ok"] for r in res), "/", len(res),
               "| confident", sum(r["confident"] for r in res), "| avg s", round(sum(r["seconds"] for r in res) / len(res), 1))
+    guard = run_guard(golden["guard"], golden["login"])
+    out["guard"] = guard
+    unseen = [r for r in guard if not r["in_prompt"]]
+    print(f"topic guard: {sum(r['ok'] for r in guard)}/{len(guard)} correct, {sum(r['ok'] for r in unseen)}/{len(unseen)} on questions not in the prompt examples")
+    for r in guard:
+        if not r["ok"]:
+            print("  WRONG", r["question"], "want", r["want"], "got", r["got"])
+    routing = run_routing(golden["routing"], svc)
+    out["routing"] = routing
+    print(f"routing and streamer extraction: {sum(r['ok'] for r in routing)}/{len(routing)} from the model alone, {sum(r['with_safety_net'] for r in routing)}/{len(routing)} with the known-streamer safety net")
+    for r in routing:
+        if not r["ok"]:
+            print("  WRONG", r["question"], "want", r["want_tool"], r["want_streamer"], "got", r["got_tool"], r["got_streamer"])
     (HERE / "eval" / "results").mkdir(exist_ok=True)
     path = HERE / "eval" / "results" / f"{time.strftime('%Y%m%d-%H%M%S')}.json"
     path.write_text(json.dumps(out, indent=2))

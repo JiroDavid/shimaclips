@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from ask.api import router as ask_router
+from ask.api import make_router as make_ask_router
 from crawler import WatchCrawler
 from jobs import JobStore, job_to_dict, run_job
 from live import LiveClips
@@ -47,8 +47,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["Content-Disposition"],
 )
-
-app.include_router(ask_router)
 
 job_store = JobStore()
 _twitch: TwitchClient | None = None
@@ -100,6 +98,9 @@ def get_live() -> LiveClips:
         if _live is None:
             _live = LiveClips(store, get_twitch)
         return _live
+
+
+app.include_router(make_ask_router(get_store, get_live, get_twitch))
 
 
 def get_crawler() -> WatchCrawler:

@@ -8,6 +8,8 @@ from ask.dates import resolve
 OLLAMA = "http://localhost:11434"
 CHAT_MODEL = "llama3.1:8b"
 
+STREAMER = {"type": "string", "description": "the streamer's name exactly as the user wrote it, without @. Leave out if the user names no streamer."}
+
 TOOLS = [
     {
         "type": "function",
@@ -17,10 +19,10 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "login": {"type": "string", "description": "streamer login, lowercase"},
+                    "streamer": STREAMER,
                     "when": {"type": "string", "description": "date phrase such as 'this month', 'last week', '2026-03', 'March 2025', '2025'"},
                 },
-                "required": ["login", "when"],
+                "required": ["when"],
             },
         },
     },
@@ -28,16 +30,32 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "top_clips",
-            "description": "List a streamer's most viewed (or newest) clips in a date range.",
+            "description": "List a streamer's most viewed (or newest) clips in one date range.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "login": {"type": "string"},
+                    "streamer": STREAMER,
                     "when": {"type": "string", "description": "date phrase such as 'this month'"},
                     "limit": {"type": "integer", "description": "how many clips, default 10"},
                     "sort": {"type": "string", "enum": ["views", "newest"]},
                 },
-                "required": ["login", "when"],
+                "required": ["when"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "top_clips_by_month",
+            "description": "Top clips for EACH month of a year, such as for a year rewind video.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "streamer": STREAMER,
+                    "year": {"type": "integer", "description": "the year, for example 2026"},
+                    "per_month": {"type": "integer", "description": "clips per month, default 10"},
+                },
+                "required": ["year"],
             },
         },
     },
@@ -45,27 +63,36 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_clips",
-            "description": "Find clips about a topic or event by what is said in them. Use for any question about what happened, was said, or when something occurred.",
+            "description": "Find clips about a topic or event by what is said in them. Use for any question about what happened, was said, who someone is, or when something occurred.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "login": {"type": "string"},
+                    "streamer": STREAMER,
                     "query": {"type": "string", "description": "the topic to look for, as a short search phrase"},
                 },
-                "required": ["login", "query"],
+                "required": ["query"],
             },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "streamer_info",
+            "description": "Basic facts about a streamer's channel: when the account was created and how many clips are stored.",
+            "parameters": {"type": "object", "properties": {"streamer": STREAMER}, "required": []},
         },
     },
 ]
 
 SYSTEM = (
-    "You route questions about a Twitch streamer's clip library to exactly one tool. "
-    "Never answer from memory. The streamer defaults to {login} unless another is named. "
-    "Copy the date words from the question into 'when' exactly as the user wrote them, such as 'month before last' or 'last 7 days'. Never rephrase or simplify a date phrase and never compute dates."
+    "You route questions about a Twitch streamer's clips to exactly one tool. "
+    "Always call exactly one tool, never reply in plain text. Never answer from memory. {default} "
+    "Copy the date words from the question into 'when' exactly as the user wrote them, such as 'month before last' or 'last 7 days'. "
+    "Never rephrase or simplify a date phrase and never compute dates."
 )
 
 
-def route(question: str, login: str) -> dict:
+def route(question: str, login: str | None) -> dict:
     resp = httpx.post(
         f"{OLLAMA}/api/chat",
         json={
@@ -74,7 +101,7 @@ def route(question: str, login: str) -> dict:
             "options": {"temperature": 0},
             "tools": TOOLS,
             "messages": [
-                {"role": "system", "content": SYSTEM.format(login=login)},
+                {"role": "system", "content": SYSTEM.format(default=f"The default streamer is {login}, used when the question names none." if login else "There is no default streamer.")},
                 {"role": "user", "content": question},
             ],
         },

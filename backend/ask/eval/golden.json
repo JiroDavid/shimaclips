@@ -916,5 +916,157 @@
       "dates": [],
       "expect": "abstain"
     }
+  ],
+  "guard": [
+    {
+      "question": "top 10 clips for jasontheween this month",
+      "label": "clips"
+    },
+    {
+      "question": "how many clips did stableronaldo get in 2025",
+      "label": "clips"
+    },
+    {
+      "question": "clips of him cooking",
+      "label": "clips"
+    },
+    {
+      "question": "who is burger? jasontheween stableronaldo",
+      "label": "clips"
+    },
+    {
+      "question": "who is jasontheween's girlfriend",
+      "label": "clips"
+    },
+    {
+      "question": "what did he say about the nba",
+      "label": "clips"
+    },
+    {
+      "question": "find clips where he talks about boxing",
+      "label": "clips"
+    },
+    {
+      "question": "hey im making a 2026 rewind video for jasontheween, could you get the top 10 clips for each month?",
+      "label": "clips"
+    },
+    {
+      "question": "when did he do his island stream",
+      "label": "clips"
+    },
+    {
+      "question": "did jasontheween win an award in streamer awards?",
+      "label": "twitch_other"
+    },
+    {
+      "question": "is stableronaldo in the top 100 streamers this year",
+      "label": "twitch_other"
+    },
+    {
+      "question": "what are 7tv emotes?",
+      "label": "twitch_other"
+    },
+    {
+      "question": "how do I become a twitch affiliate",
+      "label": "twitch_other"
+    },
+    {
+      "question": "what is the best software for streaming",
+      "label": "twitch_other"
+    },
+    {
+      "question": "what twitch extensions are popular right now",
+      "label": "twitch_other"
+    },
+    {
+      "question": "who is the most followed streamer on twitch",
+      "label": "twitch_other"
+    },
+    {
+      "question": "who won the nba finals",
+      "label": "off_topic"
+    },
+    {
+      "question": "give me a recipe for carbonara",
+      "label": "off_topic"
+    },
+    {
+      "question": "write a python function that reverses a string",
+      "label": "off_topic"
+    },
+    {
+      "question": "what is the capital of france",
+      "label": "off_topic"
+    },
+    {
+      "question": "what is 17 times 23",
+      "label": "off_topic"
+    },
+    {
+      "question": "who is the president of the united states",
+      "label": "off_topic"
+    }
+  ],
+  "routing": [
+    {
+      "question": "hey im making a 2026 rewind video for jasontheween, could you retrieve the top 10 clips for each month this year?",
+      "default": null,
+      "tool": "top_clips_by_month",
+      "streamer": "jasontheween"
+    },
+    {
+      "question": "top 10 clips for each month of 2025 for stableronaldo",
+      "default": null,
+      "tool": "top_clips_by_month",
+      "streamer": "stableronaldo"
+    },
+    {
+      "question": "how many clips did ludwig get in 2024",
+      "default": null,
+      "tool": "count_clips",
+      "streamer": "ludwig"
+    },
+    {
+      "question": "top 5 clips this week from arky",
+      "default": null,
+      "tool": "top_clips",
+      "streamer": "arky"
+    },
+    {
+      "question": "who is burger? jasontheween",
+      "default": null,
+      "tool": "search_clips",
+      "streamer": "jasontheween"
+    },
+    {
+      "question": "find clips where he talks about boxing",
+      "default": "jasontheween",
+      "tool": "search_clips",
+      "streamer": null
+    },
+    {
+      "question": "how many clips this month",
+      "default": "jasontheween",
+      "tool": "count_clips",
+      "streamer": null
+    },
+    {
+      "question": "when did marlon go to new york",
+      "default": null,
+      "tool": "search_clips",
+      "streamer": "marlon"
+    },
+    {
+      "question": "tell me about yugi's channel",
+      "default": null,
+      "tool": "streamer_info",
+      "streamer": "yugi"
+    },
+    {
+      "question": "top clips of all time for @shroud",
+      "default": null,
+      "tool": "top_clips",
+      "streamer": "shroud"
+    }
   ]
 }
