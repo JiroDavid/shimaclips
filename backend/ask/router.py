@@ -81,14 +81,16 @@ def route(question: str, login: str) -> dict:
         timeout=120,
     )
     resp.raise_for_status()
-    calls = resp.json()["message"].get("tool_calls") or []
+    body = resp.json()
+    usage = {"prompt_tokens": body.get("prompt_eval_count", 0), "output_tokens": body.get("eval_count", 0)}
+    calls = body["message"].get("tool_calls") or []
     if not calls:
-        return {"tool": None, "args": {}}
+        return {"tool": None, "args": {}, "usage": usage}
     fn = calls[0]["function"]
     args = fn["arguments"]
     if isinstance(args, str):
         args = json.loads(args)
-    return {"tool": fn["name"], "args": args}
+    return {"tool": fn["name"], "args": args, "usage": usage}
 
 
 def with_dates(args: dict, today: date) -> dict:
