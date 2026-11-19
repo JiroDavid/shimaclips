@@ -8,7 +8,7 @@ from ask.live_data import ensure_range, is_exact, top_by_month
 from ask.router import CHAT_MODEL, OLLAMA, route, with_dates
 from ask.search import search_clips
 from ask.services import Services
-from ask.streamers import mentioned, public, resolve, split_names
+from ask.streamers import all_mentioned, mentioned, public, resolve, split_names
 from ask.tools import ToolError, count_clips, open_readonly, top_clips
 from twitch import TwitchError
 
@@ -197,7 +197,9 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
             res = resolve(svc, candidate)
             if res["status"] == "ok":
                 break
-        if len(split_names(str(name))) > 1 and res["status"] == "ok":
+        if res["status"] == "unknown" and mentioned(svc, question):
+            res = resolve(svc, mentioned(svc, question))
+        if res["status"] == "ok" and max(len(all_mentioned(svc, question)), len(split_names(str(name)))) > 1:
             out["note"] = f"I can only search one streamer at a time, so I used {res['streamer'].display_name}."
         if res["status"] == "error":
             out["kind"], out["answer"], out["confident"] = "error", f"I couldn't reach Twitch to look that streamer up: {res['message']}", False

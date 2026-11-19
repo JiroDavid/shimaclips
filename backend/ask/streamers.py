@@ -27,12 +27,18 @@ def rank_suggestions(typed: str, hits: list, limit: int) -> list:
     )[:limit]
 
 
-def mentioned(svc: Services, question: str) -> str | None:
+def all_mentioned(svc: Services, question: str) -> list[str]:
     known = set(svc.store.known_logins())
+    found: list[str] = []
     for word in re.findall(r"[a-z0-9_]+", question.lower()):
-        if word in known:
-            return word
-    return None
+        if word in known and word not in found:
+            found.append(word)
+    return found
+
+
+def mentioned(svc: Services, question: str) -> str | None:
+    found = all_mentioned(svc, question)
+    return found[0] if found else None
 
 
 def resolve(svc: Services, name: str) -> dict:

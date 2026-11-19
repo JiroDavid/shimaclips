@@ -172,3 +172,10 @@ def test_suggestions_are_ranked_by_closeness_to_what_was_typed():
     from ask.streamers import rank_suggestions
     hits = [ChannelHit(str(i), n, n, "", False) for i, n in enumerate(["jasontheween_yujin", "jasontheween", "jasontheweens"])]
     assert [h.login for h in rank_suggestions("jasonthewen", hits, 2)] == ["jasontheween", "jasontheweens"]
+
+
+def test_glued_names_fall_back_to_a_known_streamer_in_the_question(monkeypatch, svc):
+    patch_flow(monkeypatch, args={"streamer": "jaystableronaldo", "when": "this month"})
+    monkeypatch.setattr(answer, "is_exact", lambda *a: True)
+    r = answer.ask(svc, "who is burger? jay stableronaldo", None, TODAY)
+    assert r["kind"] == "answer" and r["streamer"]["login"] == "jay"
