@@ -239,27 +239,47 @@ export type AskSource = {
   id: string;
   title: string;
   url: string;
+  thumbnail_url?: string;
   view_count: number;
   created_at: string;
   transcript?: string;
   score?: number;
 };
 
+export type AskSuggestion = {
+  login: string;
+  display_name: string;
+  avatar_url: string;
+  is_live: boolean;
+};
+
+export type AskMonth = {
+  month: string;
+  total_loaded: number;
+  exact: boolean;
+  clips: Clip[];
+};
+
 export type AskResult = {
   question: string;
-  tool: string | null;
+  kind: "answer" | "refusal" | "needs_streamer" | "unknown_streamer" | "error";
   answer: string;
+  note?: string;
+  streamer: { login: string; display_name: string } | null;
+  suggestions: AskSuggestion[];
+  tool: string | null;
   sources: AskSource[];
+  months: AskMonth[];
   confident: boolean;
   usage: { prompt_tokens: number; output_tokens: number };
   seconds: number;
 };
 
-export async function askQuestion(login: string, question: string): Promise<AskResult> {
+export async function askQuestion(question: string, login: string | null): Promise<AskResult> {
   const r = await fetch(`${API}/api/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ login, question }),
+    body: JSON.stringify({ question, login }),
   });
   if (!r.ok) throw new Error(await errorMessage(r));
   return r.json();
