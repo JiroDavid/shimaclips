@@ -10,6 +10,15 @@ MONTHS = {
 }
 
 
+def _month_number(word: str) -> int | None:
+    if len(word) < 3:
+        return None
+    for name, number in MONTHS.items():
+        if name == word or (word in ("sept",) and name == "september") or (len(word) == 3 and name.startswith(word)):
+            return number
+    return None
+
+
 def _month_range(year: int, month: int) -> tuple[date, date]:
     start = date(year, month, 1)
     end = date(year + (month == 12), month % 12 + 1, 1)
@@ -35,6 +44,20 @@ def resolve(phrase: str, today: date) -> tuple[date, date] | None:
         first = date(today.year, today.month, 1)
         prev = first - timedelta(days=1)
         return _month_range(prev.year, prev.month)
+    if p in ("the month before last", "month before last"):
+        last_month_end = date(today.year, today.month, 1) - timedelta(days=1)
+        earlier = date(last_month_end.year, last_month_end.month, 1) - timedelta(days=1)
+        return _month_range(earlier.year, earlier.month)
+    m = re.fullmatch(r"(?:the )?(?:past|last|previous) (\d{1,4}) days?", p)
+    if m and int(m[1]) >= 1:
+        n = int(m[1])
+        return today - timedelta(days=n - 1), today + timedelta(days=1)
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", p):
+        try:
+            d = date.fromisoformat(p)
+        except ValueError:
+            return None
+        return d, d + timedelta(days=1)
     if p == "this year":
         return date(today.year, 1, 1), date(today.year + 1, 1, 1)
     if p == "last year":
@@ -46,6 +69,6 @@ def resolve(phrase: str, today: date) -> tuple[date, date] | None:
     if m and 1 <= int(m[2]) <= 12:
         return _month_range(int(m[1]), int(m[2]))
     m = re.fullmatch(r"([a-z]+)(?: (\d{4}))?", p)
-    if m and m[1] in MONTHS:
-        return _month_range(int(m[2]) if m[2] else today.year, MONTHS[m[1]])
+    if m and _month_number(m[1]):
+        return _month_range(int(m[2]) if m[2] else today.year, _month_number(m[1]))
     return None

@@ -61,7 +61,7 @@ TOOLS = [
 SYSTEM = (
     "You route questions about a Twitch streamer's clip library to exactly one tool. "
     "Never answer from memory. The streamer defaults to {login} unless another is named. "
-    "Pass date phrases through unchanged in 'when'; do not compute dates."
+    "Copy the date words from the question into 'when' exactly as the user wrote them, such as 'month before last' or 'last 7 days'. Never rephrase or simplify a date phrase and never compute dates."
 )
 
 

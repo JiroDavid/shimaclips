@@ -21,6 +21,9 @@ TODAY = date(2026, 11, 19)
     ("2026-12", (date(2026, 12, 1), date(2027, 1, 1))),
     ("March 2025", (date(2025, 3, 1), date(2025, 4, 1))),
     ("december", (date(2026, 12, 1), date(2027, 1, 1))),
+    ("Feb 2026", (date(2026, 2, 1), date(2026, 3, 1))),
+    ("sept", (date(2026, 9, 1), date(2026, 10, 1))),
+    ("mar", (date(2026, 3, 1), date(2026, 4, 1))),
 ])
 def test_resolve(phrase, expected):
     assert resolve(phrase, TODAY) == expected
@@ -79,3 +82,21 @@ def test_unknown_streamer_and_bad_dates_rejected(conn):
 def test_connection_is_read_only(conn):
     with pytest.raises(sqlite3.OperationalError):
         conn.execute("DELETE FROM clips")
+
+
+@pytest.mark.parametrize("phrase,expected", [
+    ("the month before last", (date(2026, 9, 1), date(2026, 10, 1))),
+    ("past 30 days", (date(2026, 10, 21), date(2026, 11, 20))),
+    ("last 7 days", (date(2026, 11, 13), date(2026, 11, 20))),
+    ("2026-11-10", (date(2026, 11, 10), date(2026, 11, 11))),
+])
+def test_resolve_rolling_and_exact(phrase, expected):
+    assert resolve(phrase, TODAY) == expected
+
+
+def test_resolve_month_before_last_across_year():
+    assert resolve("month before last", date(2026, 1, 5)) == (date(2025, 11, 1), date(2025, 12, 1))
+
+
+def test_resolve_rejects_impossible_date():
+    assert resolve("2026-02-31", TODAY) is None

@@ -2,18 +2,184 @@
   "today": "2026-11-19",
   "login": "jasontheween",
   "structured": [
-    {"id": "s01", "question": "How many clips does he have this month?", "tool": "count_clips", "start": "2026-11-01", "end": "2026-12-01"},
-    {"id": "s02", "question": "How many clips did he get last month?", "tool": "count_clips", "start": "2026-10-01", "end": "2026-11-01"},
-    {"id": "s03", "question": "How many clips did he get in 2025?", "tool": "count_clips", "start": "2025-01-01", "end": "2026-01-01"},
-    {"id": "s04", "question": "How many clips in March 2026?", "tool": "count_clips", "start": "2026-03-01", "end": "2026-04-01"},
-    {"id": "s05", "question": "How many clips were made yesterday?", "tool": "count_clips", "start": "2026-11-18", "end": "2026-11-19"},
-    {"id": "s06", "question": "How many clips did ludwig get in 2024?", "tool": "count_clips", "login": "ludwig", "start": "2024-01-01", "end": "2025-01-01"},
-    {"id": "s07", "question": "What are the top 10 clips this month?", "tool": "top_clips", "start": "2026-11-01", "end": "2026-12-01", "limit": 10, "sort": "views"},
-    {"id": "s08", "question": "Show me the top 5 clips last week", "tool": "top_clips", "start": "2026-11-09", "end": "2026-11-16", "limit": 5, "sort": "views"},
-    {"id": "s09", "question": "Most viewed clips of 2025", "tool": "top_clips", "start": "2025-01-01", "end": "2026-01-01", "limit": 10, "sort": "views"},
-    {"id": "s10", "question": "Show the 3 newest clips from October 2026", "tool": "top_clips", "start": "2026-10-01", "end": "2026-11-01", "limit": 3, "sort": "newest"},
-    {"id": "s11", "question": "Give me the 20 most viewed clips in January 2026", "tool": "top_clips", "start": "2026-01-01", "end": "2026-02-01", "limit": 20, "sort": "views"},
-    {"id": "s12", "question": "Top 3 clips this week", "tool": "top_clips", "start": "2026-11-16", "end": "2026-11-23", "limit": 3, "sort": "views"}
+    {
+      "id": "s01",
+      "question": "How many clips does he have this month?",
+      "tool": "count_clips",
+      "start": "2026-11-01",
+      "end": "2026-12-01"
+    },
+    {
+      "id": "s02",
+      "question": "How many clips did he get last month?",
+      "tool": "count_clips",
+      "start": "2026-10-01",
+      "end": "2026-11-01"
+    },
+    {
+      "id": "s03",
+      "question": "How many clips did he get in 2025?",
+      "tool": "count_clips",
+      "start": "2025-01-01",
+      "end": "2026-01-01"
+    },
+    {
+      "id": "s04",
+      "question": "How many clips in March 2026?",
+      "tool": "count_clips",
+      "start": "2026-03-01",
+      "end": "2026-04-01"
+    },
+    {
+      "id": "s05",
+      "question": "How many clips were made yesterday?",
+      "tool": "count_clips",
+      "start": "2026-11-18",
+      "end": "2026-11-19"
+    },
+    {
+      "id": "s06",
+      "question": "How many clips did ludwig get in 2024?",
+      "tool": "count_clips",
+      "login": "ludwig",
+      "start": "2024-01-01",
+      "end": "2025-01-01"
+    },
+    {
+      "id": "s07",
+      "question": "What are the top 10 clips this month?",
+      "tool": "top_clips",
+      "start": "2026-11-01",
+      "end": "2026-12-01",
+      "limit": 10,
+      "sort": "views"
+    },
+    {
+      "id": "s08",
+      "question": "Show me the top 5 clips last week",
+      "tool": "top_clips",
+      "start": "2026-11-09",
+      "end": "2026-11-16",
+      "limit": 5,
+      "sort": "views"
+    },
+    {
+      "id": "s09",
+      "question": "Most viewed clips of 2025",
+      "tool": "top_clips",
+      "start": "2025-01-01",
+      "end": "2026-01-01",
+      "limit": 10,
+      "sort": "views"
+    },
+    {
+      "id": "s10",
+      "question": "Show the 3 newest clips from October 2026",
+      "tool": "top_clips",
+      "start": "2026-10-01",
+      "end": "2026-11-01",
+      "limit": 3,
+      "sort": "newest"
+    },
+    {
+      "id": "s11",
+      "question": "Give me the 20 most viewed clips in January 2026",
+      "tool": "top_clips",
+      "start": "2026-01-01",
+      "end": "2026-02-01",
+      "limit": 20,
+      "sort": "views"
+    },
+    {
+      "id": "s12",
+      "question": "Top 3 clips this week",
+      "tool": "top_clips",
+      "start": "2026-11-16",
+      "end": "2026-11-23",
+      "limit": 3,
+      "sort": "views"
+    },
+    {
+      "id": "h01",
+      "question": "how many clips did he get in the past 30 days?",
+      "tool": "count_clips",
+      "start": "2026-10-21",
+      "end": "2026-11-20",
+      "note": "30 days including today"
+    },
+    {
+      "id": "h02",
+      "question": "how many clips in the month before last",
+      "tool": "count_clips",
+      "start": "2026-09-01",
+      "end": "2026-10-01"
+    },
+    {
+      "id": "h03",
+      "question": "how mny clips did he get in Octobr",
+      "tool": "count_clips",
+      "start": "2026-10-01",
+      "end": "2026-11-01",
+      "note": "typos"
+    },
+    {
+      "id": "h04",
+      "question": "top 5 most watched clips from September",
+      "tool": "top_clips",
+      "start": "2026-09-01",
+      "end": "2026-10-01",
+      "limit": 5,
+      "sort": "views"
+    },
+    {
+      "id": "h05",
+      "question": "what is his biggest clip of 2026",
+      "tool": "top_clips",
+      "start": "2026-01-01",
+      "end": "2027-01-01",
+      "limit": 1,
+      "sort": "views"
+    },
+    {
+      "id": "h06",
+      "question": "how many clips were made on 2026-11-10",
+      "tool": "count_clips",
+      "start": "2026-11-10",
+      "end": "2026-11-11"
+    },
+    {
+      "id": "h07",
+      "question": "top 10 clips in the last 7 days",
+      "tool": "top_clips",
+      "start": "2026-11-13",
+      "end": "2026-11-20",
+      "limit": 10,
+      "sort": "views",
+      "note": "7 days back from today, today included"
+    },
+    {
+      "id": "h08",
+      "question": "number of clips last year",
+      "tool": "count_clips",
+      "start": "2025-01-01",
+      "end": "2026-01-01"
+    },
+    {
+      "id": "h09",
+      "question": "which clips got the most views in Feb 2026? just 4",
+      "tool": "top_clips",
+      "start": "2026-02-01",
+      "end": "2026-03-01",
+      "limit": 4,
+      "sort": "views"
+    },
+    {
+      "id": "h10",
+      "question": "count his clips for this year",
+      "tool": "count_clips",
+      "start": "2026-01-01",
+      "end": "2027-01-01"
+    }
   ],
   "semantic": [],
   "mixed": []
