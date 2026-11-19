@@ -172,6 +172,8 @@ export function useStreamer() {
   const dispose = useCallback(() => {
     openId.current++;
     stop();
+    phaseRef.current = "idle";
+    loginRef.current = null;
   }, [stop]);
 
   useEffect(() => dispose, [dispose]);

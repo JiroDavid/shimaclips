@@ -43,7 +43,10 @@ function Browse() {
   useEffect(() => () => preview.close(), [preview]);
   const fromUrl = useSearchParams().get("streamer") ?? "";
   const [lastLogin, setLastLogin] = useState("");
-  const openedFromUrl = useRef<string | null>(null);
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  });
   const [owner, setOwner] = useState<string | null>(null);
   const [selection, setSelection] = useState<{
     login: string;
@@ -120,11 +123,8 @@ function Browse() {
   }
 
   useEffect(() => {
-    if (fromUrl && openedFromUrl.current !== fromUrl) {
-      openedFromUrl.current = fromUrl;
-      open(fromUrl);
-    }
-  }, [fromUrl, open]);
+    if (fromUrl) openRef.current(fromUrl);
+  }, [fromUrl]);
 
   function retry() {
     if (streamer) refresh(false);
@@ -145,6 +145,12 @@ function Browse() {
         </div>
 
         <StreamerSearch onSelect={submit} />
+
+        {fromUrl && phase === "idle" && !streamer && (
+          <p className="text-sm text-zinc-400" role="status">
+            Opening {fromUrl}...
+          </p>
+        )}
 
         <WatchlistPanel
           entries={watchlist.entries}
@@ -282,7 +288,7 @@ function Browse() {
 
 export default function BrowsePage() {
   return (
-    <Suspense>
+    <Suspense fallback={<p className="p-6 text-sm text-zinc-400">Loading...</p>}>
       <Browse />
     </Suspense>
   );

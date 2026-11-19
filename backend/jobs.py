@@ -8,8 +8,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from downloader import clip_basename, download_clip
+from workdir import sweep, work_dir
 
 JOB_TTL_SECONDS = 3600
+JOB_PREFIX = "shimaclips_"
 
 
 @dataclass
@@ -32,15 +34,17 @@ class Job:
 
 
 class JobStore:
-    def __init__(self):
+    def __init__(self, base: Path | None = None):
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
+        self._base = base
+        sweep(JOB_PREFIX, self._base)
 
     def create(self, clips: list[dict]) -> Job:
         self._prune()
         job = Job(
             id=uuid.uuid4().hex,
-            dir=Path(tempfile.mkdtemp(prefix="shimaclips_")),
+            dir=Path(tempfile.mkdtemp(prefix=JOB_PREFIX, dir=self._base or work_dir())),
             items=[Item(name=clip_basename(i + 1, c["view_count"], c["title"])) for i, c in enumerate(clips)],
         )
         with self._lock:
@@ -87,9 +91,11 @@ def run_job(job: Job, clips: list[dict], fetch=download_clip) -> None:
             job.file_path = done[0]
         else:
             zip_path = job.dir / "clips.zip"
-            with zipfile.ZipFile(zip_path, "w") as z:
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as z:
                 for p in done:
                     z.write(p, p.name)
+            for p in done:
+                p.unlink(missing_ok=True)
             job.file_path = zip_path
         job.status = "done"
     except Exception as e:

@@ -14,8 +14,10 @@ from pathlib import Path
 import numpy as np
 
 from downloader import download_clip
+from workdir import work_dir
 
 MODEL_NAME = "small.en"
+TMP_PREFIX = "shimaclips_tr_"
 
 log = logging.getLogger(__name__)
 _model = None
@@ -95,7 +97,7 @@ def transcribe_path(path: Path) -> tuple[str, float]:
 
 
 def transcribe_url(url: str) -> tuple[str, float, float]:
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(prefix=TMP_PREFIX, dir=work_dir()) as tmp:
         _id, path, dl, err = _download("clip", url, Path(tmp))
         if path is None:
             raise RuntimeError(err)
@@ -114,7 +116,7 @@ def transcribe_missing(
     done = {r[0] for r in conn.execute("SELECT clip_id FROM transcripts")}
     todo = [(cid, url) for cid, url in clips if cid not in done]
     n = 0
-    with tempfile.TemporaryDirectory() as tmp, ThreadPoolExecutor(workers) as pool:
+    with tempfile.TemporaryDirectory(prefix=TMP_PREFIX, dir=work_dir()) as tmp, ThreadPoolExecutor(workers) as pool:
         for clip_id, path, dl, err in pool.map(lambda c: _download(c[0], c[1], Path(tmp)), todo):
             if should_stop():
                 break

@@ -12,9 +12,10 @@ from ask.keyword import add_missing
 from ask.live_data import ensure_range
 from ask.services import Services
 from ask.subset import pick_subset
-from ask.transcribe import transcribe_missing
+from ask.transcribe import TMP_PREFIX, transcribe_missing
 from store import Streamer
 from twitch import TwitchError
+from workdir import sweep
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ def _months(since: date, today: date):
 class TranscriptionManager:
     def __init__(self, svc: Services):
         self.svc = svc
+        sweep(TMP_PREFIX, older_than=3600)
         self._jobs: dict[str, Job] = {}
         self._queue: queue.Queue[Streamer] = queue.Queue()
         self._lock = threading.Lock()

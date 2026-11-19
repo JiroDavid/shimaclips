@@ -61,12 +61,19 @@ function ClipGrid({ clips, picker }: { clips: Clip[]; picker: Picker }) {
   );
 }
 
+const BIG_DOWNLOAD = 15;
+
+function confirmDownload(count: number): boolean {
+  if (count < BIG_DOWNLOAD) return true;
+  return window.confirm(`Download ${count} clips? These are full-quality videos, so this can take several gigabytes of disk space.`);
+}
+
 function Months({ months, onDownload, busy, picker }: { months: AskMonth[]; onDownload: (c: Clip[]) => void; busy: boolean; picker: Picker }) {
   const all = months.flatMap((m) => m.clips);
   return (
     <div className="space-y-6">
       <button
-        onClick={() => onDownload(all)}
+        onClick={() => confirmDownload(all.length) && onDownload(all)}
         disabled={busy || all.length === 0}
         className="rounded-full border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-900 disabled:opacity-50"
       >
@@ -402,7 +409,7 @@ export default function AskChat() {
             <span>{pluralClips(selection.size)}</span>
             <span className="flex gap-2">
               <button
-                onClick={() => void download.start(Array.from(selection.values()))}
+                onClick={() => confirmDownload(selection.size) && void download.start(Array.from(selection.values()))}
                 disabled={download.downloading}
                 className="rounded-full bg-zinc-100 px-4 py-1.5 font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
               >
