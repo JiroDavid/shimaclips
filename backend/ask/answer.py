@@ -14,7 +14,7 @@ from ask.router import CHAT_MODEL, OLLAMA, route, with_dates
 from ask.search import search_clips
 from ask.services import Services
 from ask.streamers import all_mentioned, clean_login, mentioned, public, resolve, split_names, who_is_target
-from ask.tools import ToolError, count_clips, open_readonly, top_clips
+from ask.tools import ToolError, count_clips, open_readonly, top_clips, view_stats
 from twitch import TwitchError
 
 OFF_TOPIC = "This isn't Twitch related, so I can't help with that. I can answer questions about streamers and their clips."
@@ -91,6 +91,22 @@ def _start_transcription(svc: Services, streamer) -> dict | None:
     return svc.transcriber.start(streamer)
 
 
+WHO_SUBJECT = re.compile(r"\bwho(?:'s| is)\s+@?([a-z0-9_]+)", re.I)
+
+
+def _subject_is(question: str, name: str | None) -> bool:
+    m = WHO_SUBJECT.search(question)
+    return bool(m) and clean_login(m.group(1)) == clean_login(str(name or ""))
+
+
+def _who_is_something_else(svc: Services, question: str, chosen: str | None) -> bool:
+    m = WHO_SUBJECT.search(question)
+    if not m:
+        return False
+    subject = clean_login(m.group(1))
+    return subject not in svc.store.known_logins() and subject != clean_login(str(chosen or ""))
+
+
 def _is_known(svc: Services, name: str | None, default_login: str) -> bool:
     login = clean_login(str(name or ""))
     return not login or login == default_login or login in svc.store.known_logins()
@@ -162,11 +178,26 @@ def _web_flow(svc: Services, question: str, default_login: str | None, out: dict
 
 def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: str, args: dict, streamer, today: date) -> None:
     bid = streamer.broadcaster_id
-    if tool in ("count_clips", "top_clips"):
+    if tool in ("count_clips", "top_clips", "view_stats"):
         args.setdefault("when", "all time")
         args = with_dates(args, today)
         start, end = date.fromisoformat(args["start"]), date.fromisoformat(args["end"])
-        if tool == "count_clips":
+        if tool == "view_stats":
+            r = view_stats(conn, streamer.login, args["start"], args["end"])
+            r["exact"] = is_exact(svc, streamer, start, end, today)
+            out["data"] = r
+            if r["count"] == 0:
+                out["answer"] = f"I don't have any of {streamer.display_name}'s clips loaded for that period, so I can't work out their views."
+                out["confident"] = False
+            else:
+                out["answer"] = (
+                    f"{streamer.display_name}'s clips from {r['start']} up to (not including) {r['end']} averaged {r['average']:,.0f} views each "
+                    f"(median {r['median']:,.0f}, most viewed {r['max']:,}), across {r['count']:,} clips and {r['total']:,} views in total."
+                )
+                out["after"] = "These are views on clips, not stream viewership, so they measure how often viewers clipped and watched moments."
+                if not r["exact"]:
+                    out["after"] += " This period isn't fully loaded, so the numbers cover only the clips we have."
+        elif tool == "count_clips":
             r = count_clips(conn, streamer.login, args["start"], args["end"])
             r["exact"] = is_exact(svc, streamer, start, end, today)
             out["data"] = r
@@ -201,7 +232,10 @@ def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: 
                 label = "newest" if sort == "newest" else "top"
                 n = len(r["clips"])
                 period = "of all time" if start == date(2007, 1, 1) else f"from {r['start']} to {r['end']}"
-                if n == 1:
+                if n == 1 and limit == 1:
+                    kind = "newest" if sort == "newest" else "most viewed"
+                    out["answer"] = f"Here is {streamer.display_name}'s {kind} clip {period}."
+                elif n == 1:
                     out["answer"] = f"Here is the only clip I found for {streamer.display_name} {period}."
                 else:
                     out["answer"] = f"Here are the {label} {n} clips for {streamer.display_name} {period}."
@@ -312,6 +346,11 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
         out["fallback"] = "no topic was given, showed the top clips instead"
     args = dict(routed["args"])
     name = args.pop("streamer", None) or mentioned(svc, question) or default_login
+    if routed["tool"] == "streamer_info" and _who_is_something_else(svc, question, routed["args"].get("streamer")):
+        routed = {"tool": "search_clips", "args": {"query": question}, "usage": routed["usage"]}
+        args = {"query": question}
+        name = mentioned(svc, question) or default_login
+        out["fallback"] = "the question asks who or what something else is, searched the clips instead"
     if routed["tool"] == "streamer_info" and default_login and not _is_known(svc, name, default_login):
         routed = {"tool": "search_clips", "args": {"query": question}, "usage": routed["usage"]}
         args, name = dict(routed["args"]), default_login
@@ -331,6 +370,12 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
                 break
         if res["status"] == "unknown" and mentioned(svc, question):
             res = resolve(svc, mentioned(svc, question))
+        if res["status"] == "unknown" and default_login and _subject_is(question, name):
+            routed = {"tool": "search_clips", "args": {"query": question}, "usage": routed["usage"]}
+            args = {"query": question}
+            out["tool"], out["args"] = routed["tool"], routed["args"]
+            out["fallback"] = "not a streamer, searched the clips instead"
+            res = resolve(svc, default_login)
         if res["status"] == "ok" and max(len(all_mentioned(svc, question)), len(split_names(str(name)))) > 1:
             out["note"] = f"I can only search one streamer at a time, so I used {res['streamer'].display_name}."
         if res["status"] == "error":

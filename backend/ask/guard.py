@@ -9,7 +9,7 @@ LABELS = ("clips", "twitch_other", "off_topic")
 SYSTEM = """You are a topic filter for an assistant that answers questions about Twitch streamers using their clips.
 Choose exactly one label:
 - clips: about a specific streamer, their clips, streams, stats, or what they said or did. Any subject counts if it is about the streamer or their clips (a streamer cooking, playing basketball, or talking about food is still clips).
-- twitch_other: about Twitch or streaming in general but not answerable from clip data: awards, rankings, emotes, extensions, Twitch rules or policies, news, how to stream or grow a channel.
+- twitch_other: about Twitch or streaming in general but not answerable from clip data: awards, rankings, emotes, extensions, Twitch rules or policies, news, how to stream or grow a channel, and facts about a streamer as a person (their age, real name, birthplace, career). Questions about a streamer's relationships, dating, family or private life are clips: they are answered only from what the clips say.
 - off_topic: nothing to do with Twitch, streamers or content creation: sports results, recipes, programming help, general knowledge, math.
 Questions asking when, whether or what someone said, mentioned or talked about are clips, whatever the subject (sports, games, food and so on).
 Reply with JSON only: {"label": "clips"} or {"label": "twitch_other"} or {"label": "off_topic"}.
@@ -17,6 +17,10 @@ Examples:
 "top 10 clips for jasontheween this month" -> clips
 "clips of him cooking" -> clips
 "who is burger?" -> clips
+"who is jasontheween" -> clips
+"how old is ludwig" -> twitch_other
+"where is stableronaldo from" -> twitch_other
+"is arky dating anyone" -> clips
 "what did he say about the nba" -> clips
 "did jasontheween win a streamer award?" -> twitch_other
 "is stableronaldo in the top 100 streamers" -> twitch_other

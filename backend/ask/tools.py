@@ -65,3 +65,16 @@ def top_clips(
         (bid, s, e, limit),
     ).fetchall()
     return {"login": login, "start": s, "end": e, "clips": [dict(r) for r in rows]}
+
+
+def view_stats(conn: sqlite3.Connection, login: str, start: str, end: str) -> dict:
+    s, e = _range(start, end)
+    bid = _broadcaster(conn, login)
+    views = [r[0] for r in conn.execute(
+        "SELECT view_count FROM clips WHERE broadcaster_id = ? AND created_at >= ? AND created_at < ? ORDER BY view_count",
+        (bid, s, e),
+    )]
+    n = len(views)
+    median = 0 if n == 0 else (views[n // 2] if n % 2 else (views[n // 2 - 1] + views[n // 2]) / 2)
+    return {"login": login, "start": s, "end": e, "count": n, "total": sum(views),
+            "average": round(sum(views) / n, 1) if n else 0.0, "median": median, "max": views[-1] if n else 0}

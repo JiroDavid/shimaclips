@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 
 from ask.dates import resolve
-from ask.tools import ToolError, count_clips, open_readonly, top_clips
+from ask.tools import ToolError, count_clips, open_readonly, top_clips, view_stats
 
 TODAY = date(2026, 11, 19)
 
@@ -109,3 +109,10 @@ def test_resolve_rejects_impossible_date():
 
 def test_since_is_not_silently_treated_as_a_single_month():
     assert resolve("since March", TODAY) is None
+
+
+def test_view_stats_average_median_total_and_empty_period(conn):
+    r = view_stats(conn, "jay", "2026-11-01", "2026-12-02")
+    assert (r["count"], r["total"], r["max"], r["median"]) == (4, 1559, 999, 275.0) and r["average"] == 389.8
+    empty = view_stats(conn, "jay", "2030-01-01", "2030-02-01")
+    assert (empty["count"], empty["average"], empty["median"]) == (0, 0.0, 0)

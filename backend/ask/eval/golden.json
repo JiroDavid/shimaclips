@@ -179,6 +179,13 @@
       "tool": "count_clips",
       "start": "2026-01-01",
       "end": "2027-01-01"
+    },
+    {
+      "id": "s13",
+      "question": "What was the average number of views per clip for jasontheween in October 2026?",
+      "tool": "view_stats",
+      "start": "2026-10-01",
+      "end": "2026-11-01"
     }
   ],
   "semantic": [
@@ -1005,6 +1012,18 @@
     {
       "question": "who is the president of the united states",
       "label": "off_topic"
+    },
+    {
+      "question": "how old is Ludwig?",
+      "label": "twitch_other"
+    },
+    {
+      "question": "what is arky's real name",
+      "label": "twitch_other"
+    },
+    {
+      "question": "how many views did jasontheween average this month?",
+      "label": "clips"
     }
   ],
   "routing": [
@@ -1067,6 +1086,12 @@
       "default": null,
       "tool": "top_clips",
       "streamer": "shroud"
+    },
+    {
+      "question": "how many views did jasontheween average this month?",
+      "default": null,
+      "tool": "view_stats",
+      "streamer": "jasontheween"
     }
   ],
   "web": [

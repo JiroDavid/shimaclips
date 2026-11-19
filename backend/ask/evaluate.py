@@ -53,6 +53,12 @@ def run_structured(conn, svc, cases, default_login, today):
         args_ok = data.get("start") == c["start"] and data.get("end") == c["end"] and data.get("login") == login
         if c["tool"] == "count_clips":
             value_ok = data.get("count") == expected_count(conn, login, c["start"], c["end"])
+        elif c["tool"] == "view_stats":
+            row = conn.execute(
+                "SELECT COUNT(*), AVG(view_count) FROM clips WHERE broadcaster_id = ? AND created_at >= ? AND created_at < ?",
+                (_bid(conn, login), c["start"], c["end"]),
+            ).fetchone()
+            value_ok = data.get("count") == row[0] and abs(data.get("average", -1) - round(row[1] or 0, 1)) < 0.05
         else:
             got = [s["view_count"] for s in r["sources"]] if c["sort"] == "views" else None
             want = expected_top_views(conn, login, c["start"], c["end"], c["limit"], c["sort"])
@@ -192,7 +198,7 @@ def run_routing(cases, svc):
         got = r["args"].get("streamer")
         got = clean_login(str(got)) if got else None
         rows.append({"question": c["question"], "want_tool": c["tool"], "got_tool": r["tool"], "want_streamer": c["streamer"],
-                     "got_streamer": got, "with_safety_net": (got or mentioned(svc, c["question"])) == c["streamer"] or (c["streamer"] is None and (got or mentioned(svc, c["question"]) or c["default"]) == c["default"]) and r["tool"] == c["tool"], "ok": r["tool"] == c["tool"] and (got == c["streamer"] or (c["streamer"] is None and got == c["default"]))})
+                     "got_streamer": got, "with_safety_net": r["tool"] == c["tool"] and ((got or mentioned(svc, c["question"])) == c["streamer"] or (c["streamer"] is None and (got or mentioned(svc, c["question"]) or c["default"]) == c["default"])), "ok": r["tool"] == c["tool"] and (got == c["streamer"] or (c["streamer"] is None and got == c["default"]))})
     return rows
 
 

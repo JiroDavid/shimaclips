@@ -293,3 +293,43 @@ def test_top_clips_with_no_date_means_all_time(monkeypatch, svc):
     monkeypatch.setattr(answer, "is_exact", lambda *a: True)
     r = answer.ask(svc, "jay's best clips", None, TODAY)
     assert [c["id"] for c in r["sources"]] == ["c3", "c2"] and r["data"]["start"] == "2007-01-01"
+
+
+def test_average_views_answer_uses_the_database_and_says_these_are_clip_views(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="view_stats", args={"streamer": "jay", "when": "this month"})
+    monkeypatch.setattr(answer, "is_exact", lambda *a: True)
+    r = answer.ask(svc, "how many views did jay average this month", None, TODAY)
+    assert r["tool"] == "view_stats" and "averaged 200 views each" in r["answer"] and "not stream viewership" in r["after"]
+    assert r["data"]["count"] == 3 and r["data"]["total"] == 600
+
+
+def test_asking_for_the_most_viewed_clip_does_not_say_it_is_the_only_one(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="top_clips", args={"streamer": "jay", "when": "all time", "limit": 1})
+    monkeypatch.setattr(answer, "is_exact", lambda *a: True)
+    r = answer.ask(svc, "jay's most viewed clip ever", None, TODAY)
+    assert "most viewed clip of all time" in r["answer"] and "only clip" not in r["answer"]
+
+
+def test_who_is_a_nickname_is_never_answered_with_a_streamer_profile(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="streamer_info", args={"streamer": "jay"})
+    monkeypatch.setattr(answer, "_transcribed", lambda *a: 0)
+    r = answer.ask(svc, "who is burger? jay", None, TODAY)
+    assert r["tool"] == "search_clips" and "fallback" in r and r["streamer"]["login"] == "jay"
+
+
+def test_a_profile_question_about_a_real_streamer_still_uses_the_profile(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="streamer_info", args={"streamer": "jay"})
+    r = answer.ask(svc, "tell me about jay's channel please", None, TODAY)
+    assert r["tool"] == "streamer_info" and "a Twitch Partner" in r["answer"]
+
+
+def test_who_is_a_non_streamer_with_a_streamer_selected_searches_that_streamers_clips(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="search_clips", args={"streamer": "burger", "query": "burger"})
+    monkeypatch.setattr(answer, "_transcribed", lambda *a: 0)
+    r = answer.ask(svc, "who is burger", "jay", TODAY)
+    assert r["kind"] == "answer" and r["streamer"]["login"] == "jay" and r["tool"] == "search_clips" and "fallback" in r
+
+
+def test_who_is_a_non_streamer_with_nothing_selected_still_offers_suggestions(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="search_clips", args={"streamer": "burger", "query": "burger"})
+    assert answer.ask(svc, "who is burger", None, TODAY)["kind"] == "unknown_streamer"

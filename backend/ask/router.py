@@ -46,6 +46,21 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "view_stats",
+            "description": "Average, median and total views of a streamer's clips in a date range. Use for 'average views', 'how many views in total'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "streamer": STREAMER,
+                    "when": {"type": "string", "description": "date phrase such as 'this month'"},
+                },
+                "required": ["when"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "top_clips_by_month",
             "description": "Top clips for EACH month of a year, such as for a year rewind video.",
             "parameters": {
@@ -78,7 +93,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "streamer_info",
-            "description": "Who a streamer is: their Twitch profile (bio, partner status, account age, live status) plus a few of their top clips. Use for 'who is <streamer>' or 'tell me about <streamer>'.",
+            "description": "Who a streamer is: their Twitch profile (bio, partner status, account age, live status) plus a few of their top clips. Use ONLY when the whole question is just who a streamer is ('who is <streamer>', 'tell me about <streamer>'). If the question asks who or what something else is, such as a nickname, joke or thing, use search_clips.",
             "parameters": {"type": "object", "properties": {"streamer": STREAMER}, "required": []},
         },
     },
