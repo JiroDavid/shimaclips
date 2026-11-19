@@ -1,7 +1,13 @@
+import ctypes
+import glob
+import importlib.util
+import logging
+import os
 import subprocess
 import sqlite3
 import tempfile
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -11,14 +17,41 @@ from downloader import download_clip
 
 MODEL_NAME = "small.en"
 
+log = logging.getLogger(__name__)
 _model = None
+
+
+def _preload_cuda_libs() -> None:
+    pending: list[str] = []
+    for pkg in ("nvidia.cublas", "nvidia.cudnn"):
+        spec = importlib.util.find_spec(pkg)
+        for base in (spec.submodule_search_locations or []) if spec else []:
+            pending += glob.glob(os.path.join(base, "lib", "lib*.so*"))
+    pending.sort(key=lambda p: ("Lt" not in p, p))
+    for _ in range(3):
+        pending = [lib for lib in pending if not _try_load(lib)]
+        if not pending:
+            return
+
+
+def _try_load(lib: str) -> bool:
+    try:
+        ctypes.CDLL(lib, mode=ctypes.RTLD_GLOBAL)
+        return True
+    except OSError:
+        return False
 
 
 def _load_model():
     global _model
     if _model is None:
         from faster_whisper import WhisperModel
-        _model = WhisperModel(MODEL_NAME, device="cuda", compute_type="float16")
+        try:
+            _preload_cuda_libs()
+            _model = WhisperModel(MODEL_NAME, device="cuda", compute_type="float16")
+        except Exception:
+            log.warning("GPU transcription unavailable, falling back to the CPU (much slower)", exc_info=True)
+            _model = WhisperModel(MODEL_NAME, device="cpu", compute_type="int8")
     return _model
 
 
@@ -70,20 +103,30 @@ def transcribe_url(url: str) -> tuple[str, float, float]:
     return text, dl, tr
 
 
-def transcribe_missing(conn: sqlite3.Connection, clips: list[tuple[str, str]], workers: int = 4) -> int:
+def transcribe_missing(
+    conn: sqlite3.Connection,
+    clips: list[tuple[str, str]],
+    workers: int = 4,
+    on_clip: Callable[[], None] | None = None,
+    should_stop: Callable[[], bool] = lambda: False,
+) -> int:
     ensure_schema(conn)
     done = {r[0] for r in conn.execute("SELECT clip_id FROM transcripts")}
     todo = [(cid, url) for cid, url in clips if cid not in done]
     n = 0
     with tempfile.TemporaryDirectory() as tmp, ThreadPoolExecutor(workers) as pool:
         for clip_id, path, dl, err in pool.map(lambda c: _download(c[0], c[1], Path(tmp)), todo):
+            if should_stop():
+                break
+            if on_clip is not None:
+                on_clip()
             if path is None:
-                print(f"skip {clip_id}: {err}")
+                log.info("skip %s: %s", clip_id, err)
                 continue
             try:
                 text, tr = transcribe_path(path)
             except Exception as e:
-                print(f"skip {clip_id}: {e}")
+                log.info("skip %s: %s", clip_id, e)
                 continue
             finally:
                 path.unlink(missing_ok=True)

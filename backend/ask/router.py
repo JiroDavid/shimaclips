@@ -30,12 +30,12 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "top_clips",
-            "description": "List a streamer's most viewed (or newest) clips in one date range.",
+            "description": "List a streamer's most viewed (or newest) clips in one date range. Use this for 'show me X's clips' or 'X's best clips' with no dates, passing when='all time'.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "streamer": STREAMER,
-                    "when": {"type": "string", "description": "date phrase such as 'this month'"},
+                    "when": {"type": "string", "description": "date phrase such as 'this month', or 'all time' when no dates are given"},
                     "limit": {"type": "integer", "description": "how many clips, default 10"},
                     "sort": {"type": "string", "enum": ["views", "newest"]},
                 },
@@ -63,7 +63,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_clips",
-            "description": "Find clips about a topic or event by what is said in them. Use for any question about what happened, was said, or when something occurred, and for who or what a nickname, running joke or non-streamer is.",
+            "description": "Find clips about a specific topic or event by what is said in them. Only use this when the question names a topic; to just show a streamer's clips use top_clips. Use for any question about what happened, was said, or when something occurred, and for who or what a nickname, running joke or non-streamer is.",
             "parameters": {
                 "type": "object",
                 "properties": {

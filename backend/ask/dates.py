@@ -28,6 +28,8 @@ def _month_range(year: int, month: int) -> tuple[date, date]:
 def resolve(phrase: str, today: date) -> tuple[date, date] | None:
     """Turn a date phrase into a half-open range [start, end), or None if not understood."""
     p = re.sub(r"^(?:in|during|for|from|of|over|within)\s+", "", phrase.strip(" ?.!,").lower())
+    if p in ("all time", "ever", "all", "of all time"):
+        return date(2007, 1, 1), today + timedelta(days=1)
     if p == "today":
         return today, today + timedelta(days=1)
     if p == "yesterday":

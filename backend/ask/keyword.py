@@ -28,6 +28,17 @@ def content_words(question: str) -> list[str]:
     return list(dict.fromkeys(words))
 
 
+def add_missing(conn: sqlite3.Connection) -> int:
+    conn.execute(SCHEMA)
+    conn.execute(
+        "INSERT INTO clip_fts (clip_id, title, text) "
+        "SELECT t.clip_id, k.title, t.text FROM transcripts t JOIN clips k ON k.id = t.clip_id "
+        "WHERE t.clip_id NOT IN (SELECT clip_id FROM clip_fts)"
+    )
+    conn.commit()
+    return conn.execute("SELECT COUNT(*) FROM clip_fts").fetchone()[0]
+
+
 def match_query(question: str) -> str | None:
     words = content_words(question)
     if not words:
@@ -35,23 +46,36 @@ def match_query(question: str) -> str | None:
     return " OR ".join(f'"{w}"' for w in words)
 
 
-def unseen_words(conn: sqlite3.Connection, question: str) -> list[str]:
+def unseen_words(conn: sqlite3.Connection, question: str, broadcaster_id: str | None = None) -> list[str]:
     missing = []
     for w in content_words(question):
-        n = conn.execute("SELECT COUNT(*) FROM clip_fts WHERE clip_fts MATCH ?", (f'"{w}"',)).fetchone()[0]
+        if broadcaster_id is None:
+            n = conn.execute("SELECT COUNT(*) FROM clip_fts WHERE clip_fts MATCH ?", (f'"{w}"',)).fetchone()[0]
+        else:
+            n = conn.execute(
+                "SELECT COUNT(*) FROM clip_fts JOIN clips k ON k.id = clip_fts.clip_id "
+                "WHERE clip_fts MATCH ? AND k.broadcaster_id = ?",
+                (f'"{w}"', broadcaster_id),
+            ).fetchone()[0]
         if n == 0:
             missing.append(w)
     return missing
 
 
-def keyword_search(conn: sqlite3.Connection, question: str, k: int = 5, include_title_only: bool = True) -> list[Hit]:
+def keyword_search(
+    conn: sqlite3.Connection, question: str, k: int = 5, include_title_only: bool = True, broadcaster_id: str | None = None
+) -> list[Hit]:
     q = match_query(question)
     if q is None:
         return []
     cols = "title, text" if include_title_only else "text"
+    scope = "JOIN clips k ON k.id = clip_fts.clip_id" if broadcaster_id is not None else ""
+    where = "AND k.broadcaster_id = ?" if broadcaster_id is not None else ""
+    args = [f"{{{cols.replace(', ', ' ')}}} : ({q})"] + ([broadcaster_id] if broadcaster_id is not None else []) + [k]
     rows = conn.execute(
-        f"SELECT clip_id, bm25(clip_fts) FROM clip_fts WHERE clip_fts MATCH ? ORDER BY bm25(clip_fts) LIMIT ?",
-        (f"{{{cols.replace(', ', ' ')}}} : ({q})", k),
+        f"SELECT clip_fts.clip_id, bm25(clip_fts) FROM clip_fts {scope} WHERE clip_fts MATCH ? {where} "
+        "ORDER BY bm25(clip_fts) LIMIT ?",
+        args,
     ).fetchall()
     return [Hit(r[0], -float(r[1])) for r in rows]
 

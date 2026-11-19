@@ -7,6 +7,7 @@ from datetime import date, timedelta
 import httpx
 
 from ask.guard import classify
+from ask.transcription import ACTIVE
 from ask.web_answer import WebUnavailable, answer_from_web
 from ask.live_data import ensure_range, is_exact, top_by_month
 from ask.router import CHAT_MODEL, OLLAMA, route, with_dates
@@ -84,6 +85,12 @@ EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 TYPES = {"partner": "a Twitch Partner", "affiliate": "a Twitch Affiliate"}
 
 
+def _start_transcription(svc: Services, streamer) -> dict | None:
+    if svc.transcriber is None or os.environ.get("SHIMACLIPS_TRANSCRIBE") == "0":
+        return None
+    return svc.transcriber.start(streamer)
+
+
 def _is_known(svc: Services, name: str | None, default_login: str) -> bool:
     login = clean_login(str(name or ""))
     return not login or login == default_login or login in svc.store.known_logins()
@@ -156,6 +163,7 @@ def _web_flow(svc: Services, question: str, default_login: str | None, out: dict
 def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: str, args: dict, streamer, today: date) -> None:
     bid = streamer.broadcaster_id
     if tool in ("count_clips", "top_clips"):
+        args.setdefault("when", "all time")
         args = with_dates(args, today)
         start, end = date.fromisoformat(args["start"]), date.fromisoformat(args["end"])
         if tool == "count_clips":
@@ -191,7 +199,12 @@ def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: 
                 out["answer"] = f"I couldn't find any clips for {streamer.display_name} between {r['start']} and {r['end']}."
             else:
                 label = "newest" if sort == "newest" else "top"
-                out["answer"] = f"Here are the {label} {len(r['clips'])} clips for {streamer.display_name}, {r['start']} to {r['end']}."
+                n = len(r["clips"])
+                period = "of all time" if start == date(2007, 1, 1) else f"from {r['start']} to {r['end']}"
+                if n == 1:
+                    out["answer"] = f"Here is the only clip I found for {streamer.display_name} {period}."
+                else:
+                    out["answer"] = f"Here are the {label} {n} clips for {streamer.display_name} {period}."
                 if not exact:
                     notes.append("This period isn't fully loaded yet, so there may be clips with more views than these.")
             out["after"] = " ".join(notes)
@@ -208,13 +221,25 @@ def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: 
         if not all(m["exact"] for m in months):
             out["after"] += " Months marked as not fully loaded may be missing some clips."
     elif tool == "search_clips":
-        if _transcribed(conn, bid) == 0:
-            out["answer"] = (
-                f"I haven't transcribed {streamer.display_name}'s clips, so I can't search by topic for them. "
-                "I can still count their clips or show their top clips."
-            )
+        have = _transcribed(conn, bid)
+        status = _start_transcription(svc, streamer)
+        if have == 0:
+            if status is not None:
+                out["transcription"] = status
+                out["answer"] = (
+                    f"I haven't transcribed {streamer.display_name}'s clips yet, so I've started now. It runs in the background "
+                    "and takes a while. Topic search starts working as soon as some clips are done, and you can watch the progress below."
+                )
+            else:
+                out["answer"] = (
+                    f"I haven't transcribed {streamer.display_name}'s clips, so I can't search by topic for them. "
+                    "I can still count their clips or show their top clips."
+                )
             out["confident"] = False
             return
+        if status is not None and status["state"] in ACTIVE:
+            out["transcription"] = status
+            out["note"] = "Still transcribing this streamer's clips, so this only covers the clips done so far."
         r = search_clips(conn, streamer.login, args["query"])
         out["sources"] = r["results"]
         out["confident"] = r["confident"]
@@ -281,6 +306,10 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
     if routed["tool"] is None:
         routed = {"tool": "search_clips", "args": {"query": question}, "usage": routed["usage"]}
         out["fallback"] = "no tool chosen, searched clips instead"
+    if routed["tool"] == "search_clips" and not str(routed["args"].get("query") or "").strip():
+        kept = {k: v for k, v in routed["args"].items() if k != "query"}
+        routed = {"tool": "top_clips", "args": {**kept, "when": "all time"}, "usage": routed["usage"]}
+        out["fallback"] = "no topic was given, showed the top clips instead"
     args = dict(routed["args"])
     name = args.pop("streamer", None) or mentioned(svc, question) or default_login
     if routed["tool"] == "streamer_info" and default_login and not _is_known(svc, name, default_login):
@@ -318,7 +347,7 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
             _run_tool(svc, conn, out, usage, question, routed["tool"], args, streamer, today)
         finally:
             conn.close()
-    except (ToolError, ValueError, TypeError) as e:
+    except (ToolError, ValueError, TypeError, KeyError) as e:
         out["answer"], out["confident"] = f"I could not run that: {e}", False
     except TwitchError as e:
         out["kind"], out["answer"], out["confident"] = "error", f"Twitch did not respond: {e}", False

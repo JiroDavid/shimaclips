@@ -15,6 +15,8 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ask.api import make_router as make_ask_router
+from ask.services import Services
+from ask.transcription import TranscriptionManager
 from crawler import WatchCrawler
 from jobs import JobStore, job_to_dict, run_job
 from live import LiveClips
@@ -32,7 +34,9 @@ async def lifespan(app: FastAPI):
         get_crawler().start()
     yield
     with _deps_lock:
-        crawler, manager = _crawler, _manager
+        crawler, manager, transcriber = _crawler, _manager, _transcriber
+    if transcriber is not None:
+        transcriber.stop()
     if crawler is not None:
         crawler.stop()
     if manager is not None:
@@ -100,7 +104,20 @@ def get_live() -> LiveClips:
         return _live
 
 
-app.include_router(make_ask_router(get_store, get_live, get_twitch))
+_transcriber: TranscriptionManager | None = None
+
+
+def get_transcriber() -> TranscriptionManager:
+    global _transcriber
+    store = get_store()
+    live = get_live()
+    with _deps_lock:
+        if _transcriber is None:
+            _transcriber = TranscriptionManager(Services(store, live, get_twitch))
+        return _transcriber
+
+
+app.include_router(make_ask_router(get_store, get_live, get_twitch, get_transcriber))
 
 
 def get_crawler() -> WatchCrawler:

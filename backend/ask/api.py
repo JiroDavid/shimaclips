@@ -38,7 +38,7 @@ def _valid_id(conversation_id: str) -> str:
     return conversation_id
 
 
-def make_router(get_store, get_live, get_twitch) -> APIRouter:
+def make_router(get_store, get_live, get_twitch, get_transcriber=lambda: None) -> APIRouter:
     router = APIRouter()
 
     def history(store) -> History:
@@ -55,7 +55,7 @@ def make_router(get_store, get_live, get_twitch) -> APIRouter:
         ):
             raise HTTPException(404, "Unknown conversation")
         question = req.question.strip()
-        result = ask(Services(store, live, get_twitch), question, login)
+        result = ask(Services(store, live, get_twitch, get_transcriber()), question, login)
         result["conversation_id"] = hist.add_turn(req.conversation_id, question, result)
         _log({
             "question": result["question"], "topic": result.get("topic"), "kind": result["kind"],
@@ -86,5 +86,23 @@ def make_router(get_store, get_live, get_twitch) -> APIRouter:
         if not history(store).delete(_valid_id(conversation_id)):
             raise HTTPException(404, "Unknown conversation")
         return {"ok": True}
+
+    def _streamer(login: str, store):
+        found = store.get_streamer(login.strip().lower()) if LOGIN.match(login.strip().lower()) else None
+        if found is None:
+            raise HTTPException(404, "Unknown streamer")
+        return found
+
+    @router.get("/api/streamers/{login}/transcribe")
+    def transcription_status(login: str, store=Depends(get_store), transcriber=Depends(get_transcriber)) -> dict:
+        if transcriber is None:
+            raise HTTPException(503, "Transcription is not available")
+        return transcriber.status(_streamer(login, store))
+
+    @router.post("/api/streamers/{login}/transcribe")
+    def start_transcription(login: str, store=Depends(get_store), transcriber=Depends(get_transcriber)) -> dict:
+        if transcriber is None:
+            raise HTTPException(503, "Transcription is not available")
+        return transcriber.start(_streamer(login, store))
 
     return router

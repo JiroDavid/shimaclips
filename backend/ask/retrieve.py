@@ -12,10 +12,17 @@ class Hit:
     score: float
 
 
-def load_matrix(conn: sqlite3.Connection, kind: str) -> tuple[list[str], np.ndarray]:
-    rows = conn.execute(
-        "SELECT clip_id, vec FROM clip_vectors WHERE kind = ? AND model = ?", (kind, EMBED_MODEL)
-    ).fetchall()
+def load_matrix(conn: sqlite3.Connection, kind: str, broadcaster_id: str | None = None) -> tuple[list[str], np.ndarray]:
+    if broadcaster_id is None:
+        rows = conn.execute(
+            "SELECT clip_id, vec FROM clip_vectors WHERE kind = ? AND model = ?", (kind, EMBED_MODEL)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT v.clip_id, v.vec FROM clip_vectors v JOIN clips k ON k.id = v.clip_id "
+            "WHERE v.kind = ? AND v.model = ? AND k.broadcaster_id = ?",
+            (kind, EMBED_MODEL, broadcaster_id),
+        ).fetchall()
     ids = [r[0] for r in rows]
     mat = np.vstack([np.frombuffer(r[1], dtype=np.float32) for r in rows]) if rows else np.zeros((0, 1), np.float32)
     return ids, mat

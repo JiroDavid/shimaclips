@@ -7,9 +7,9 @@ from ask.retrieve import Hit
 def make():
     c = sqlite3.connect(":memory:")
     c.executescript(
-        "CREATE TABLE clips (id TEXT, title TEXT);"
+        "CREATE TABLE clips (id TEXT, title TEXT, broadcaster_id TEXT DEFAULT 'b1');"
         "CREATE TABLE transcripts (clip_id TEXT, text TEXT);"
-        "INSERT INTO clips VALUES ('a', 'island day one'), ('b', 'chess time'), ('c', 'funny');"
+        "INSERT INTO clips (id, title) VALUES ('a', 'island day one'), ('b', 'chess time'), ('c', 'funny');"
         "INSERT INTO transcripts VALUES ('a', 'we landed on the island today'), "
         "('b', 'I am bad at chess honestly'), ('c', 'chess on the island');"
     )
@@ -48,3 +48,17 @@ def test_unseen_words_flags_terms_absent_from_the_library():
 
 def test_apostrophes_do_not_create_bad_terms():
     assert match_query("someone's birthday") == '"someone" OR "birthday"'
+
+
+def test_search_and_vocabulary_are_scoped_to_one_streamer():
+    c = make()
+    c.executescript(
+        "INSERT INTO clips VALUES ('z', 'poker night', 'b2');"
+        "INSERT INTO transcripts VALUES ('z', 'we played poker and chess all evening');"
+    )
+    rebuild(c)
+    assert {h.clip_id for h in keyword_search(c, "chess", k=5)} == {"b", "c", "z"}
+    assert {h.clip_id for h in keyword_search(c, "chess", k=5, broadcaster_id="b1")} == {"b", "c"}
+    assert [h.clip_id for h in keyword_search(c, "poker", k=5, broadcaster_id="b2")] == ["z"]
+    assert unseen_words(c, "poker night", "b1") == ["poker", "night"]
+    assert unseen_words(c, "poker night", "b2") == []

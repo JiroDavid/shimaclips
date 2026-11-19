@@ -18,12 +18,12 @@ def search_clips(conn: sqlite3.Connection, login: str, query: str, limit: int = 
     bid = _broadcaster(conn, login)
     limit = max(1, min(int(limit), MAX_LIMIT))
     query = query.strip()
-    ids, mat = load_matrix(conn, "transcript")
+    ids, mat = load_matrix(conn, "transcript", bid)
     qv = embed_query(query)
     cosine = dict(zip(ids, (mat @ qv).tolist())) if ids else {}
     wide = limit * 5
     emb = top_k(qv, ids, mat, k=wide)
-    kw = keyword_search(conn, query, k=wide)
+    kw = keyword_search(conn, query, k=wide, broadcaster_id=bid)
     ranked = {"embedding": emb, "keyword": kw, "hybrid": fuse([emb, kw], k=wide)}[mode]
     results = []
     for h in ranked:
@@ -42,6 +42,6 @@ def search_clips(conn: sqlite3.Connection, login: str, query: str, limit: int = 
         if len(results) == limit:
             break
     best = max((r["score"] for r in results), default=0.0)
-    unseen = unseen_words(conn, query)
+    unseen = unseen_words(conn, query, bid)
     confident = bool(results) and not (unseen and best < STRONG_MATCH)
     return {"login": login, "query": query, "results": results, "confident": confident, "unseen_words": unseen}

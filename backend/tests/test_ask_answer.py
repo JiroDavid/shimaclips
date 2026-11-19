@@ -278,3 +278,18 @@ def test_who_is_target_only_matches_known_streamers(svc):
     assert who_is_target(svc, "Tell me about @Jay!", None) == "jay"
     assert who_is_target(svc, "who is burger", None) is None
     assert who_is_target(svc, "who is jay and why does he clip so much", None) is None
+
+
+def test_topic_search_with_no_topic_shows_the_top_clips_instead_of_an_error(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="search_clips", args={"streamer": "jay"})
+    monkeypatch.setattr(answer, "is_exact", lambda *a: True)
+    r = answer.ask(svc, "show me jay's clips", None, TODAY)
+    assert r["tool"] == "top_clips" and "fallback" in r and len(r["sources"]) == 3
+    assert r["answer"].startswith("Here are the top 3 clips for") and "could not run" not in r["answer"]
+
+
+def test_top_clips_with_no_date_means_all_time(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="top_clips", args={"streamer": "jay", "limit": 2})
+    monkeypatch.setattr(answer, "is_exact", lambda *a: True)
+    r = answer.ask(svc, "jay's best clips", None, TODAY)
+    assert [c["id"] for c in r["sources"]] == ["c3", "c2"] and r["data"]["start"] == "2007-01-01"

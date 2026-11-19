@@ -71,9 +71,9 @@ def run_structured(conn, svc, cases, default_login, today):
     return results
 
 
-def run_retrieval(conn, entries):
-    t_ids, t_mat = load_matrix(conn, "transcript")
-    k_ids, k_mat = load_matrix(conn, "title")
+def run_retrieval(conn, entries, broadcaster_id):
+    t_ids, t_mat = load_matrix(conn, "transcript", broadcaster_id)
+    k_ids, k_mat = load_matrix(conn, "title", broadcaster_id)
     modes = ["title_embed", "transcript_embed", "keyword", "hybrid"]
     per_mode = {m: [] for m in modes}
     detail = []
@@ -83,9 +83,9 @@ def run_retrieval(conn, entries):
         lists = {
             "title_embed": top_k(qv, k_ids, k_mat, k=5),
             "transcript_embed": top_k(qv, t_ids, t_mat, k=5),
-            "keyword": keyword_search(conn, e["question"], k=5),
+            "keyword": keyword_search(conn, e["question"], k=5, broadcaster_id=broadcaster_id),
         }
-        lists["hybrid"] = fuse([top_k(qv, t_ids, t_mat, k=20), keyword_search(conn, e["question"], k=20)], k=5)
+        lists["hybrid"] = fuse([top_k(qv, t_ids, t_mat, k=20), keyword_search(conn, e["question"], k=20, broadcaster_id=broadcaster_id)], k=5)
         row = {"id": e["id"], "n_relevant": len(rel)}
         for m in modes:
             ids = [h.clip_id for h in lists[m]]
@@ -158,7 +158,7 @@ def main() -> None:
         if not r["passed"]:
             print("  FAIL", r["id"], r["question"], {k: r[k] for k in ("tool_ok", "args_ok", "value_ok", "got_tool", "got_args")})
     scored = golden["semantic"] + golden["mixed"]
-    summary, detail = run_retrieval(conn, scored)
+    summary, detail = run_retrieval(conn, scored, _bid(conn, golden["login"]))
     out["retrieval"], out["retrieval_detail"] = summary, detail
     print("retrieval over", len(scored), "questions")
     for m, v in summary.items():
