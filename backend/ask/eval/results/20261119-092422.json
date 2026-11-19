@@ -1,0 +1,234 @@
+{
+  "ran_at": "2026-11-19 09:24:08",
+  "today": "2026-11-19",
+  "structured": [
+    {
+      "id": "s01",
+      "question": "How many clips does he have this month?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "this month"
+      },
+      "usage": {
+        "prompt_tokens": 430,
+        "output_tokens": 28
+      },
+      "seconds": 0.86
+    },
+    {
+      "id": "s02",
+      "question": "How many clips did he get last month?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "last month"
+      },
+      "usage": {
+        "prompt_tokens": 430,
+        "output_tokens": 28
+      },
+      "seconds": 0.83
+    },
+    {
+      "id": "s03",
+      "question": "How many clips did he get in 2025?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "2025"
+      },
+      "usage": {
+        "prompt_tokens": 432,
+        "output_tokens": 28
+      },
+      "seconds": 1.26
+    },
+    {
+      "id": "s04",
+      "question": "How many clips in March 2026?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "March 2026"
+      },
+      "usage": {
+        "prompt_tokens": 430,
+        "output_tokens": 30
+      },
+      "seconds": 0.89
+    },
+    {
+      "id": "s05",
+      "question": "How many clips were made yesterday?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "yesterday"
+      },
+      "usage": {
+        "prompt_tokens": 428,
+        "output_tokens": 28
+      },
+      "seconds": 0.77
+    },
+    {
+      "id": "s06",
+      "question": "How many clips did ludwig get in 2024?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "count_clips",
+      "got_args": {
+        "login": "ludwig",
+        "when": "2024"
+      },
+      "usage": {
+        "prompt_tokens": 433,
+        "output_tokens": 27
+      },
+      "seconds": 0.9
+    },
+    {
+      "id": "s07",
+      "question": "What are the top 10 clips this month?",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "login": "jasontheween",
+        "when": "this month",
+        "limit": "10",
+        "sort": "views"
+      },
+      "usage": {
+        "prompt_tokens": 431,
+        "output_tokens": 40
+      },
+      "seconds": 1.04
+    },
+    {
+      "id": "s08",
+      "question": "Show me the top 5 clips last week",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "5",
+        "sort": "views",
+        "login": "jasontheween",
+        "when": "last week"
+      },
+      "usage": {
+        "prompt_tokens": 430,
+        "output_tokens": 40
+      },
+      "seconds": 1.11
+    },
+    {
+      "id": "s09",
+      "question": "Most viewed clips of 2025",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "10",
+        "sort": "views",
+        "login": "jasontheween",
+        "when": "2025"
+      },
+      "usage": {
+        "prompt_tokens": 428,
+        "output_tokens": 40
+      },
+      "seconds": 3.63
+    },
+    {
+      "id": "s10",
+      "question": "Show the 3 newest clips from October 2026",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "3",
+        "sort": "newest",
+        "login": "jasontheween",
+        "when": "October 2026"
+      },
+      "usage": {
+        "prompt_tokens": 432,
+        "output_tokens": 43
+      },
+      "seconds": 1.14
+    },
+    {
+      "id": "s11",
+      "question": "Give me the 20 most viewed clips in January 2026",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "limit": "20",
+        "login": "jasontheween",
+        "sort": "views",
+        "when": "January 2026"
+      },
+      "usage": {
+        "prompt_tokens": 434,
+        "output_tokens": 42
+      },
+      "seconds": 1.15
+    },
+    {
+      "id": "s12",
+      "question": "Top 3 clips this week",
+      "tool_ok": true,
+      "args_ok": true,
+      "value_ok": true,
+      "passed": true,
+      "got_tool": "top_clips",
+      "got_args": {
+        "sort": "views",
+        "login": "jasontheween",
+        "when": "this week",
+        "limit": "3"
+      },
+      "usage": {
+        "prompt_tokens": 427,
+        "output_tokens": 40
+      },
+      "seconds": 1.06
+    }
+  ]
+}

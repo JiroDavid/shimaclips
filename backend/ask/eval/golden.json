@@ -1,0 +1,20 @@
+{
+  "today": "2026-11-19",
+  "login": "jasontheween",
+  "structured": [
+    {"id": "s01", "question": "How many clips does he have this month?", "tool": "count_clips", "start": "2026-11-01", "end": "2026-12-01"},
+    {"id": "s02", "question": "How many clips did he get last month?", "tool": "count_clips", "start": "2026-10-01", "end": "2026-11-01"},
+    {"id": "s03", "question": "How many clips did he get in 2025?", "tool": "count_clips", "start": "2025-01-01", "end": "2026-01-01"},
+    {"id": "s04", "question": "How many clips in March 2026?", "tool": "count_clips", "start": "2026-03-01", "end": "2026-04-01"},
+    {"id": "s05", "question": "How many clips were made yesterday?", "tool": "count_clips", "start": "2026-11-18", "end": "2026-11-19"},
+    {"id": "s06", "question": "How many clips did ludwig get in 2024?", "tool": "count_clips", "login": "ludwig", "start": "2024-01-01", "end": "2025-01-01"},
+    {"id": "s07", "question": "What are the top 10 clips this month?", "tool": "top_clips", "start": "2026-11-01", "end": "2026-12-01", "limit": 10, "sort": "views"},
+    {"id": "s08", "question": "Show me the top 5 clips last week", "tool": "top_clips", "start": "2026-11-09", "end": "2026-11-16", "limit": 5, "sort": "views"},
+    {"id": "s09", "question": "Most viewed clips of 2025", "tool": "top_clips", "start": "2025-01-01", "end": "2026-01-01", "limit": 10, "sort": "views"},
+    {"id": "s10", "question": "Show the 3 newest clips from October 2026", "tool": "top_clips", "start": "2026-10-01", "end": "2026-11-01", "limit": 3, "sort": "newest"},
+    {"id": "s11", "question": "Give me the 20 most viewed clips in January 2026", "tool": "top_clips", "start": "2026-01-01", "end": "2026-02-01", "limit": 20, "sort": "views"},
+    {"id": "s12", "question": "Top 3 clips this week", "tool": "top_clips", "start": "2026-11-16", "end": "2026-11-23", "limit": 3, "sort": "views"}
+  ],
+  "semantic": [],
+  "mixed": []
+}
