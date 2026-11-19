@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -16,7 +18,8 @@ def client(monkeypatch, tmp_path, result=None):
 
     monkeypatch.setattr(api, "ask", fake_ask)
     app = FastAPI()
-    app.include_router(api.make_router(lambda: object(), lambda: object(), lambda: None))
+    store = SimpleNamespace(path=tmp_path / "t.db")
+    app.include_router(api.make_router(lambda: store, lambda: object(), lambda: None))
     return TestClient(app), seen
 
 
