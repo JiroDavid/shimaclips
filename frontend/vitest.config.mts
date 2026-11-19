@@ -7,6 +7,13 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["lib/**/*.test.ts"],
+    include: ["lib/**/*.test.{ts,tsx}", "components/**/*.test.tsx"],
+    setupFiles: ["./test/setup.ts"],
+    coverage: {
+      provider: "v8",
+      include: ["lib/**/*.{ts,tsx}", "components/**/*.tsx"],
+      exclude: ["**/*.test.*"],
+      reporter: ["text-summary", "text"],
+    },
   },
 });

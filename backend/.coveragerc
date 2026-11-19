@@ -1,0 +1,10 @@
+[run]
+source = .
+omit =
+    tests/*
+    .venv/*
+    .work/*
+    ask/evaluate.py
+    ask/build_index.py
+    ask/build_transcripts.py
+    ask/eval/*
