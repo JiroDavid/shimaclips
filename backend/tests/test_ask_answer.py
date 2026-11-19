@@ -60,12 +60,48 @@ def test_top_k_empty_index():
     assert top_k(np.array([1.0], dtype=np.float32), [], np.zeros((0, 1), np.float32)) == []
 
 
-@pytest.mark.parametrize("label,text", [("off_topic", answer.OFF_TOPIC), ("twitch_other", answer.TWITCH_OTHER)])
-def test_refusals_never_reach_the_router(monkeypatch, svc, label, text):
-    monkeypatch.setattr(answer, "classify", lambda q, d=None: (label, USAGE))
+def test_off_topic_is_refused_and_never_reaches_the_router(monkeypatch, svc):
+    monkeypatch.setattr(answer, "classify", lambda q, d=None: ("off_topic", USAGE))
     monkeypatch.setattr(answer, "route", lambda *a: (_ for _ in ()).throw(AssertionError("must not route")))
     r = answer.ask(svc, "who won the nba", None, TODAY)
-    assert r["kind"] == "refusal" and r["answer"] == text and r["confident"] is False
+    assert r["kind"] == "refusal" and r["answer"] == answer.OFF_TOPIC and r["confident"] is False
+
+
+WEB = {"answer": "7TV emotes are third-party emotes [1].", "confident": True, "usage": USAGE, "cached": False, "seconds": 1.2,
+       "sources": [{"n": 1, "title": "7TV", "url": "https://7tv.app/", "domain": "7tv.app"}]}
+
+
+def web_flow(monkeypatch, result=WEB):
+    monkeypatch.setattr(answer, "classify", lambda q, d=None: ("twitch_other", USAGE))
+    monkeypatch.setattr(answer, "route", lambda *a: (_ for _ in ()).throw(AssertionError("must not route")))
+    monkeypatch.setattr(answer, "answer_from_web", lambda path, q: result)
+
+
+def test_general_twitch_question_is_answered_from_the_web_with_sources(monkeypatch, svc):
+    web_flow(monkeypatch)
+    r = answer.ask(svc, "what are 7tv emotes", None, TODAY)
+    assert r["kind"] == "answer" and r["answer"] == WEB["answer"] and r["web_sources"][0]["domain"] == "7tv.app"
+    assert r["sources"] == [] and r["web"] == {"cached": False, "seconds": 1.2}
+
+
+def test_web_answer_is_followed_by_the_named_streamers_top_clips(monkeypatch, svc):
+    web_flow(monkeypatch)
+    r = answer.ask(svc, "did jay win an award", None, TODAY)
+    assert r["streamer"]["login"] == "jay" and len(r["sources"]) == 3 and "most viewed clips" in r["after"]
+
+
+def test_web_failure_is_reported_not_raised(monkeypatch, svc):
+    monkeypatch.setattr(answer, "classify", lambda q, d=None: ("twitch_other", USAGE))
+    monkeypatch.setattr(answer, "answer_from_web", lambda *a: (_ for _ in ()).throw(answer.WebUnavailable("down")))
+    r = answer.ask(svc, "what are 7tv emotes", None, TODAY)
+    assert r["answer"] == answer.WEB_DOWN and r["confident"] is False and r["web_sources"] == []
+
+
+def test_web_can_be_switched_off(monkeypatch, svc):
+    web_flow(monkeypatch)
+    monkeypatch.setenv("SHIMACLIPS_WEB", "0")
+    r = answer.ask(svc, "what are 7tv emotes", None, TODAY)
+    assert r["kind"] == "refusal" and r["answer"] == answer.TWITCH_OTHER and r["web_sources"] == []
 
 
 def test_count_comes_from_the_database(monkeypatch, svc):

@@ -60,7 +60,7 @@ def make_router(get_store, get_live, get_twitch) -> APIRouter:
         _log({
             "question": result["question"], "topic": result.get("topic"), "kind": result["kind"],
             "tool": result["tool"], "args": result["args"], "confident": result["confident"],
-            "usage": result["usage"], "seconds": result["seconds"],
+            "usage": result["usage"], "seconds": result["seconds"], "web": result.get("web"),
         })
         return result
 

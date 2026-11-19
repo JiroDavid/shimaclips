@@ -1,3 +1,4 @@
+import os
 import re
 import time
 from dataclasses import asdict
@@ -6,6 +7,7 @@ from datetime import date, timedelta
 import httpx
 
 from ask.guard import classify
+from ask.web_answer import WebUnavailable, answer_from_web
 from ask.live_data import ensure_range, is_exact, top_by_month
 from ask.router import CHAT_MODEL, OLLAMA, route, with_dates
 from ask.search import search_clips
@@ -16,8 +18,12 @@ from twitch import TwitchError
 
 OFF_TOPIC = "This isn't Twitch related, so I can't help with that. I can answer questions about streamers and their clips."
 TWITCH_OTHER = (
-    "That is about Twitch, but I can only answer from clip data and channel info, and I can't look things up on the web. "
+    "That is about Twitch, but web lookups are turned off, so I can only answer from clip data and channel info. "
     "I can count clips, show a streamer's top clips (even month by month), or search what was said in transcribed clips."
+)
+WEB_DOWN = (
+    "I couldn't reach the web just now to look that up (the search service didn't answer). "
+    "Try again in a moment. I can still count clips, show top clips, or search what was said in transcribed clips."
 )
 
 ANSWER_SYSTEM = (
@@ -105,8 +111,11 @@ def _streamer_info(svc: Services, conn, out: dict, streamer, today: date) -> Non
     else:
         parts.append("I could not reach Twitch for their profile just now.")
     out["answer"] = " ".join(parts)
-    start = streamer.account_created.date()
-    ensure_range(svc, streamer, start, today + timedelta(days=1), 5, today)
+    _top_clips_context(svc, conn, out, streamer, today)
+
+
+def _top_clips_context(svc: Services, conn, out: dict, streamer, today: date) -> None:
+    ensure_range(svc, streamer, streamer.account_created.date(), today + timedelta(days=1), 5, today)
     clips, _total = svc.store.top_clips(streamer.broadcaster_id, None, None, 5, 0)
     row = conn.execute(
         "SELECT COUNT(*), MIN(created_at), MAX(created_at) FROM clips WHERE broadcaster_id = ?", (streamer.broadcaster_id,)
@@ -114,9 +123,34 @@ def _streamer_info(svc: Services, conn, out: dict, streamer, today: date) -> Non
     out["sources"] = [asdict(c) for c in clips]
     if clips:
         out["after"] = (
-            f"Here are some of their most viewed clips stored in our system. "
+            f"Here are some of {streamer.display_name}'s most viewed clips stored in our system. "
             f"I hold {row[0]:,} of their clips, from {row[1][:10]} to {row[2][:10]}."
         )
+
+
+def _web_flow(svc: Services, question: str, default_login: str | None, out: dict, usage: dict, today: date) -> None:
+    if os.environ.get("SHIMACLIPS_WEB") == "0":
+        out["kind"], out["answer"], out["confident"] = "refusal", TWITCH_OTHER, False
+        return
+    try:
+        web = answer_from_web(svc.db_path, question)
+    except (WebUnavailable, httpx.HTTPError):
+        out["answer"], out["confident"] = WEB_DOWN, False
+        return
+    _add(usage, web["usage"])
+    out["answer"], out["confident"] = web["answer"], web["confident"]
+    out["web_sources"] = web["sources"]
+    out["web"] = {"cached": web["cached"], "seconds": web["seconds"]}
+    name = mentioned(svc, question) or default_login
+    res = resolve(svc, name) if name else None
+    if res is not None and res["status"] == "ok":
+        streamer = res["streamer"]
+        out["streamer"] = public(streamer)
+        conn = open_readonly(svc.db_path)
+        try:
+            _top_clips_context(svc, conn, out, streamer, today)
+        finally:
+            conn.close()
 
 
 def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: str, args: dict, streamer, today: date) -> None:
@@ -216,7 +250,7 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
     usage = dict(NO_USAGE)
     out: dict = {
         "question": question, "kind": "answer", "tool": None, "args": {}, "streamer": None,
-        "suggestions": [], "sources": [], "months": [], "confident": True, "after": "",
+        "suggestions": [], "sources": [], "months": [], "confident": True, "after": "", "web_sources": [],
     }
 
     def finish() -> dict:
@@ -227,10 +261,14 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
     label, u = classify(question, default_login)
     _add(usage, u)
     out["topic"] = label
-    if label != "clips":
-        out["kind"] = "refusal"
-        out["answer"] = OFF_TOPIC if label == "off_topic" else TWITCH_OTHER
-        out["confident"] = False
+    if label == "off_topic":
+        out["kind"], out["answer"], out["confident"] = "refusal", OFF_TOPIC, False
+        return finish()
+    if label == "twitch_other":
+        try:
+            _web_flow(svc, question, default_login, out, usage, today)
+        except TwitchError as e:
+            out["kind"], out["answer"], out["confident"] = "error", f"Twitch did not respond: {e}", False
         return finish()
 
     target = who_is_target(svc, question, default_login)
