@@ -3,16 +3,20 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import ClipCard from "@/components/ClipCard";
+import ClipPreview, { PreviewContext } from "@/components/ClipPreview";
 import DownloadPanel from "@/components/DownloadPanel";
 import StreamerSearch from "@/components/StreamerSearch";
 import { askQuestion, type AskMonth, type AskResult, type Clip } from "@/lib/api";
+import { createPreviewController } from "@/lib/previewController";
+import { emptySelection, pluralClips, toggleClip, type Selection } from "@/lib/selection";
 import { useDownload } from "@/lib/useDownload";
 
 const EXAMPLES = [
   "Top 10 clips from last month for arky",
   "How many clips did shroud get in 2025?",
   "Top 5 clips of each month of 2025 for stableronaldo",
-  "Top 5 clips this month for yugi",
+  "Top 5 clips this month for marlon",
 ];
 
 const LABEL = "text-xs uppercase tracking-[0.2em] text-zinc-500";
@@ -26,29 +30,19 @@ function monthLabel(key: string): string {
   return new Date(Date.UTC(y, m - 1, 1)).toLocaleString("en", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-function ClipTile({ clip }: { clip: Pick<Clip, "url" | "title" | "thumbnail_url" | "view_count" | "created_at"> }) {
+type Picker = { selection: Selection; onToggle: (clip: Clip) => void };
+
+function ClipGrid({ clips, picker }: { clips: Clip[]; picker: Picker }) {
   return (
-    <a
-      href={clip.url}
-      target="_blank"
-      rel="noreferrer"
-      className="block overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 transition-colors hover:border-zinc-600"
-    >
-      {clip.thumbnail_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={clip.thumbnail_url} alt="" loading="lazy" className="aspect-video w-full object-cover" />
-      )}
-      <div className="space-y-1 p-3">
-        <p className="line-clamp-2 text-sm leading-snug">{clip.title || "Untitled clip"}</p>
-        <p className="text-xs text-zinc-500">
-          {clip.view_count.toLocaleString()} views - {clip.created_at.slice(0, 10)}
-        </p>
-      </div>
-    </a>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {clips.map((c, i) => (
+        <ClipCard key={c.id} clip={c} rank={i + 1} checked={picker.selection.has(c.id)} onToggle={() => picker.onToggle(c)} />
+      ))}
+    </div>
   );
 }
 
-function Months({ months, onDownload, busy }: { months: AskMonth[]; onDownload: (c: Clip[]) => void; busy: boolean }) {
+function Months({ months, onDownload, busy, picker }: { months: AskMonth[]; onDownload: (c: Clip[]) => void; busy: boolean; picker: Picker }) {
   const all = months.flatMap((m) => m.clips);
   return (
     <div className="space-y-6">
@@ -68,11 +62,7 @@ function Months({ months, onDownload, busy }: { months: AskMonth[]; onDownload: 
           {m.clips.length === 0 ? (
             <p className="text-sm text-zinc-500">No clips loaded for this month.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
-              {m.clips.map((c) => (
-                <ClipTile key={c.id} clip={c} />
-              ))}
-            </div>
+            <ClipGrid clips={m.clips} picker={picker} />
           )}
         </section>
       ))}
@@ -109,11 +99,13 @@ function Answer({
   onPick,
   onDownload,
   downloading,
+  picker,
 }: {
   turn: Turn;
   onPick: (login: string, question: string) => void;
   onDownload: (c: Clip[]) => void;
   downloading: boolean;
+  picker: Picker;
 }) {
   const r = turn.result;
   return (
@@ -144,14 +136,8 @@ function Answer({
                 ))}
               </div>
             )}
-            {r.months.length > 0 && <Months months={r.months} onDownload={onDownload} busy={downloading} />}
-            {r.sources.length > 0 && (
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
-                {r.sources.map((s) => (
-                  <ClipTile key={s.id} clip={{ ...s, thumbnail_url: s.thumbnail_url ?? "" }} />
-                ))}
-              </div>
-            )}
+            {r.months.length > 0 && <Months months={r.months} onDownload={onDownload} busy={downloading} picker={picker} />}
+            {r.sources.length > 0 && <ClipGrid clips={r.sources} picker={picker} />}
             {r.after && <p className="text-base leading-relaxed text-zinc-300">{r.after}</p>}
             <p className="border-t border-zinc-800 pt-3 text-xs text-zinc-500">
               {r.tool ?? "no tool"} - {r.seconds}s - {r.usage.prompt_tokens + r.usage.output_tokens} tokens (local model)
@@ -181,6 +167,10 @@ export default function AskChat() {
   const nextId = useRef(0);
   const lastTurn = useRef<HTMLDivElement>(null);
   const download = useDownload("ask");
+  const [preview] = useState(() => createPreviewController({}));
+  const [selection, setSelection] = useState<Selection>(emptySelection());
+  const picker: Picker = { selection, onToggle: (clip) => setSelection((sel) => toggleClip(sel, clip)) };
+  useEffect(() => () => preview.close(), [preview]);
   const count = turns.length;
 
   useEffect(() => {
@@ -252,8 +242,15 @@ export default function AskChat() {
     </div>
   );
 
+  const withPreview = (node: React.ReactNode) => (
+    <PreviewContext.Provider value={preview}>
+      {node}
+      <ClipPreview controller={preview} />
+    </PreviewContext.Provider>
+  );
+
   if (empty) {
-    return (
+    return withPreview(
       <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-6 py-10">
         <div className="space-y-3 text-center">
           <Logo className="mx-auto h-24 w-24" />
@@ -273,11 +270,11 @@ export default function AskChat() {
           ))}
         </div>
         <div className="pt-4">{renderLookup("center")}</div>
-      </main>
+      </main>,
     );
   }
 
-  return (
+  return withPreview(
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-8">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 py-5">
         <h1 className="text-sm font-semibold uppercase tracking-[0.3em]">Shimaclips</h1>
@@ -305,6 +302,7 @@ export default function AskChat() {
               }}
               onDownload={(clips) => void download.start(clips)}
               downloading={download.downloading}
+              picker={picker}
             />
           </div>
         ))}
@@ -314,8 +312,25 @@ export default function AskChat() {
       </div>
       <div className="sticky bottom-0 bg-zinc-950 pb-8 pt-2">
         <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-zinc-950 to-transparent" />
+        {selection.size > 0 && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm">
+            <span>{pluralClips(selection.size)}</span>
+            <span className="flex gap-2">
+              <button
+                onClick={() => void download.start(Array.from(selection.values()))}
+                disabled={download.downloading}
+                className="rounded-full bg-zinc-100 px-4 py-1.5 font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
+              >
+                {download.downloading ? "Downloading..." : "Download"}
+              </button>
+              <button onClick={() => setSelection(emptySelection())} className="rounded-full border border-zinc-700 px-4 py-1.5 hover:bg-zinc-800">
+                Clear
+              </button>
+            </span>
+          </div>
+        )}
         {form}
       </div>
-    </main>
+    </main>,
   );
 }

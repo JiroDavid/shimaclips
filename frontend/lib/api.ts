@@ -235,16 +235,7 @@ export async function setWatchPaused(login: string, paused: boolean): Promise<Wa
   return r.json();
 }
 
-export type AskSource = {
-  id: string;
-  title: string;
-  url: string;
-  thumbnail_url?: string;
-  view_count: number;
-  created_at: string;
-  transcript?: string;
-  score?: number;
-};
+export type AskSource = Clip & { transcript?: string; score?: number };
 
 export type AskSuggestion = {
   login: string;
