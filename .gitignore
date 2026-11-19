@@ -14,3 +14,4 @@ backend/*.db
 backend/*.db-wal
 backend/*.db-shm
 .claude/
+backend/ask_log.jsonl
