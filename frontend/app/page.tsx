@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import ClipPreview, { PreviewContext } from "@/components/ClipPreview";
 import { createPreviewController } from "@/lib/previewController";
+import AskPanel from "@/components/AskPanel";
 import CalendarView from "@/components/CalendarView";
 import DownloadPanel from "@/components/DownloadPanel";
 import LoadingBanner from "@/components/LoadingBanner";
@@ -187,6 +188,8 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {streamer && <AskPanel key={streamer.login} login={streamer.login} />}
 
         {streamer && (
           <>

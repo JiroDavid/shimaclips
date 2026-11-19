@@ -234,3 +234,33 @@ export async function setWatchPaused(login: string, paused: boolean): Promise<Wa
   if (!r.ok) throw new Error(await errorMessage(r));
   return r.json();
 }
+
+export type AskSource = {
+  id: string;
+  title: string;
+  url: string;
+  view_count: number;
+  created_at: string;
+  transcript?: string;
+  score?: number;
+};
+
+export type AskResult = {
+  question: string;
+  tool: string | null;
+  answer: string;
+  sources: AskSource[];
+  confident: boolean;
+  usage: { prompt_tokens: number; output_tokens: number };
+  seconds: number;
+};
+
+export async function askQuestion(login: string, question: string): Promise<AskResult> {
+  const r = await fetch(`${API}/api/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ login, question }),
+  });
+  if (!r.ok) throw new Error(await errorMessage(r));
+  return r.json();
+}
