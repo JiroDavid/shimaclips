@@ -33,6 +33,38 @@ Exact per-day counts need a full crawl, and Twitch only returns about 1,000 clip
 ## Watchlist
 A short list of streamers is kept preloaded in the background while the app is running. It lives in the local database (not in the repo) and is seeded once with a starting list. The crawler only runs while the backend is running, always yields to a streamer you open yourself, and resumes where it left off. Use the watchlist panel in the app to add, pause or remove streamers, and the "Keep this streamer up to date" toggle in the header to add or remove the open streamer. The same actions are available through the `/api/watchlist` endpoints. Crawling happens only while `./run.sh` (or the backend) is running.
 
+## Ask about clips (AI)
+Ask a question about a streamer's clips in plain English and get an answer with clickable, cited clips. It runs fully locally and costs nothing per question.
+
+Three kinds of question are handled differently:
+- **Structured** ("How many clips this month?", "Top 10 clips last week"): a local model only picks a tool and its arguments. Our code resolves dates ("this month", "last 7 days", "March 2025") and runs a read-only, validated query, so numbers always come from the database and never from the model.
+- **Semantic** ("Find clips where he talks about boxing"): hybrid search over clip transcripts. Embeddings (`nomic-embed-text`) and keyword search (SQLite FTS5) are combined with reciprocal rank fusion. A local model (`llama3.1:8b`) answers using only the retrieved clips and cites them.
+- **Mixed** ("When did he do his island stream?"): the same search, plus the dates of the cited clips computed in code. A clip date is when the clip was made, not necessarily when the stream happened.
+
+When nothing matches, it says so. If the rarest word in the question appears nowhere in the library and the best match is not strong, it abstains and explains why instead of guessing.
+
+Limits to keep in mind:
+- Only a subset is transcribed: for jasontheween, the top clips by views from each of the busiest days of 2026, plus a few from every other day (about 2,400 clips). Counts and top lists use the whole database, but topic search covers only the transcribed clips.
+- Transcripts come from audio only (faster-whisper `small.en`), so chat messages and on-screen text are invisible, and names or slang can be misheard.
+- The local 8B model can word answers badly. The cited clips and the dates are the reliable part.
+
+Build the index (needs Ollama running with `ollama pull nomic-embed-text` and `ollama pull llama3.1:8b`, and an NVIDIA GPU for fast transcription):
+1. Transcribe: `cd backend && LD_LIBRARY_PATH=$(.venv/bin/python -c "import nvidia.cublas.lib as a,nvidia.cudnn.lib as b;print(a.__path__[0]+':'+b.__path__[0])") .venv/bin/python -m ask.build_transcripts 3000` (resumable; edit the streamer and date in `ask/build_transcripts.py`).
+2. Index: `.venv/bin/python -m ask.build_index`
+
+Evaluation: `cd backend && .venv/bin/python -m ask.evaluate` runs a golden set (22 structured, 10 semantic, 2 mixed, 3 abstention questions) and saves results to `backend/ask/eval/results/`. The structured checks compare against independent SQL. For the topic questions, the answer key is every clip in the library whose title or transcript literally contains the topic word, built by `ask/eval/build_golden.py`, so it does not depend on the search under test. Because that key is word-based, it favours keyword search and understates what embeddings find through paraphrase.
+
+Latest results (12 topic questions, top 5 results):
+
+| Retrieval | hit@5 | precision@5 | MRR |
+|---|---|---|---|
+| Title embeddings | 0.67 | 0.42 | 0.67 |
+| Transcript embeddings | 0.67 | 0.53 | 0.67 |
+| Keyword (BM25) | 1.00 | 0.90 | 1.00 |
+| Hybrid (used by the app) | 1.00 | 0.73 | 0.88 |
+
+Structured questions: 22 of 22 exact, but the first run of the 10 harder phrasings scored 6 of 10 before fixes (saved as `baseline-structured-v1.json`), so treat 22 of 22 as in-sample. The model once silently rewrote "month before last" as "last month", which is why dates are resolved in code and the prompt requires the user's exact date words. Abstention: 2 of 2 on topics with no mentions (poker, Florida); a topic with two passing mentions (chess) is answered from those two clips. In the end-to-end answers, 74 percent of cited clips on topic questions are relevant. A typical answer costs about 1,000 local tokens and 2 seconds.
+
 ## Setup
 1. Create a free app at https://dev.twitch.tv/console (OAuth redirect `http://localhost`, category Other) and copy the client ID and secret.
 2. `cp backend/.env.example backend/.env` and fill in both values.
