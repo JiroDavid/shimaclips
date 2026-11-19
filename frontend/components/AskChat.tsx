@@ -28,15 +28,15 @@ function ClipTile({ clip }: { clip: Pick<Clip, "url" | "title" | "thumbnail_url"
       href={clip.url}
       target="_blank"
       rel="noreferrer"
-      className="block overflow-hidden rounded border border-zinc-800 hover:border-zinc-600"
+      className="block overflow-hidden rounded-lg border border-zinc-800 transition-colors hover:border-zinc-500"
     >
       {clip.thumbnail_url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={clip.thumbnail_url} alt="" loading="lazy" className="aspect-video w-full object-cover" />
       )}
-      <div className="space-y-0.5 p-2 text-xs">
-        <p className="line-clamp-2">{clip.title || "Untitled clip"}</p>
-        <p className="text-zinc-500">
+      <div className="space-y-1 p-3">
+        <p className="line-clamp-2 text-sm leading-snug">{clip.title || "Untitled clip"}</p>
+        <p className="text-xs text-zinc-500">
           {clip.view_count.toLocaleString()} views - {clip.created_at.slice(0, 10)}
         </p>
       </div>
@@ -51,20 +51,20 @@ function Months({ months, onDownload, busy }: { months: AskMonth[]; onDownload: 
       <button
         onClick={() => onDownload(all)}
         disabled={busy || all.length === 0}
-        className="rounded border border-zinc-700 px-3 py-2 text-sm hover:bg-zinc-800 disabled:opacity-50"
+        className="rounded-lg border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-800 disabled:opacity-50"
       >
         {busy ? "Downloading..." : `Download all ${all.length} clips`}
       </button>
       {months.map((m) => (
         <section key={m.month} className="space-y-2">
-          <h3 className="text-sm font-semibold">
+          <h3 className="text-base font-semibold">
             {monthLabel(m.month)}
             {!m.exact && <span className="ml-2 text-xs font-normal text-amber-400">not fully loaded</span>}
           </h3>
           {m.clips.length === 0 ? (
             <p className="text-xs text-zinc-500">No clips loaded for this month.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
               {m.clips.map((c) => (
                 <ClipTile key={c.id} clip={c} />
               ))}
@@ -88,11 +88,11 @@ function Answer({
   downloading: boolean;
 }) {
   const r = turn.result;
-  if (turn.error) return <p className="text-sm text-red-400">{turn.error}</p>;
-  if (!r) return <p className="text-sm text-zinc-400">Thinking...</p>;
+  if (turn.error) return <p className="text-base text-red-400">{turn.error}</p>;
+  if (!r) return <p className="text-base text-zinc-400">Thinking...</p>;
   return (
-    <div className="space-y-3">
-      <p className="whitespace-pre-wrap text-sm">{r.answer}</p>
+    <div className="space-y-4">
+      <p className="whitespace-pre-wrap text-base leading-relaxed">{r.answer}</p>
       {r.note && <p className="text-xs text-amber-400">{r.note}</p>}
       {!r.confident && r.kind === "answer" && r.sources.length > 0 && (
         <p className="text-xs text-amber-400">Low confidence: treat these clips as possible leads only.</p>
@@ -113,13 +113,13 @@ function Answer({
       )}
       {r.months.length > 0 && <Months months={r.months} onDownload={onDownload} busy={downloading} />}
       {r.sources.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
           {r.sources.map((s) => (
             <ClipTile key={s.id} clip={{ ...s, thumbnail_url: s.thumbnail_url ?? "" }} />
           ))}
         </div>
       )}
-      <p className="text-xs text-zinc-600">
+      <p className="text-xs text-zinc-500">
         {r.tool ?? "no tool"} - {r.seconds}s - {r.usage.prompt_tokens + r.usage.output_tokens} tokens (local model)
         {r.streamer && (
           <>
@@ -140,6 +140,7 @@ export default function AskChat() {
   const [text, setText] = useState("");
   const [current, setCurrent] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [lookupOpen, setLookupOpen] = useState(false);
   const nextId = useRef(0);
   const bottom = useRef<HTMLDivElement>(null);
   const download = useDownload("ask");
@@ -184,31 +185,41 @@ export default function AskChat() {
         autoFocus
         aria-label="Ask a question about a streamer's clips"
         placeholder={current ? `Ask about ${current}'s clips or Twitch` : "Ask about a streamer's clips, for example top clips for jasontheween this month"}
-        className={`flex-1 rounded-2xl border border-zinc-700 bg-zinc-900 px-5 text-base outline-none focus:border-zinc-400 ${empty ? "py-4" : "py-3"}`}
+        className={`flex-1 rounded-2xl border border-zinc-700 bg-zinc-900 px-6 outline-none focus:border-zinc-400 ${empty ? "py-5 text-lg" : "py-4 text-base"}`}
       />
       <button
         type="submit"
         disabled={busy || text.trim().length < 3}
-        className="rounded-2xl bg-zinc-100 px-5 text-sm font-medium text-zinc-900 hover:bg-white disabled:opacity-40"
+        className="rounded-2xl bg-zinc-100 px-6 text-base font-medium text-zinc-900 hover:bg-white disabled:opacity-40"
       >
         {busy ? "Thinking" : "Ask"}
       </button>
     </form>
   );
 
-  const lookup = (
-    <div className="w-full max-w-xs opacity-50 transition-opacity focus-within:opacity-100 hover:opacity-100">
-      <p className="mb-1 text-xs text-zinc-500">Or browse a streamer&apos;s calendar</p>
-      <StreamerSearch onSelect={(login) => router.push(`/browse?streamer=${encodeURIComponent(login)}`)} />
+  const renderLookup = (align: "center" | "right") => (
+    <div className="relative flex flex-col items-center">
+      <button
+        onClick={() => setLookupOpen((v) => !v)}
+        aria-expanded={lookupOpen}
+        className="text-sm text-zinc-500 underline decoration-zinc-700 underline-offset-4 hover:text-zinc-300"
+      >
+        Browse a streamer&apos;s calendar
+      </button>
+      {lookupOpen && (
+        <div className={`absolute top-full z-10 mt-2 w-80 ${align === "center" ? "left-1/2 -translate-x-1/2" : "right-0"}`}>
+          <StreamerSearch onSelect={(login) => router.push(`/browse?streamer=${encodeURIComponent(login)}`)} />
+        </div>
+      )}
     </div>
   );
 
   if (empty) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-6 px-6 py-10">
+      <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-6 py-10">
         <div className="space-y-2 text-center">
-          <h1 className="text-4xl font-bold">Shimaclips</h1>
-          <p className="text-zinc-400">Ask me anything about a streamer&apos;s Twitch clips.</p>
+          <h1 className="text-5xl font-bold">Shimaclips</h1>
+          <p className="text-lg text-zinc-400">Ask me anything about a streamer&apos;s Twitch clips.</p>
         </div>
         {form}
         <div className="flex flex-wrap justify-center gap-2">
@@ -216,22 +227,22 @@ export default function AskChat() {
             <button
               key={ex}
               onClick={() => void send(ex)}
-              className="rounded-full border border-zinc-800 px-3 py-1 text-xs text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+              className="rounded-full border border-zinc-800 px-4 py-2 text-sm text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
             >
               {ex}
             </button>
           ))}
         </div>
-        <div className="pt-6">{lookup}</div>
+        <div className="pt-4">{renderLookup("center")}</div>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3 py-4">
-        <h1 className="text-lg font-bold">Shimaclips</h1>
-        <div className="flex items-center gap-3 text-sm text-zinc-400">
+    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-8">
+      <header className="flex flex-wrap items-center justify-between gap-3 py-6">
+        <h1 className="text-xl font-bold">Shimaclips</h1>
+        <div className="flex flex-wrap items-center gap-5 text-sm text-zinc-400">
           {current && (
             <span>
               Talking about <span className="text-zinc-200">{current}</span>{" "}
@@ -240,12 +251,13 @@ export default function AskChat() {
               </button>
             </span>
           )}
+          {renderLookup("right")}
         </div>
       </header>
-      <div className="flex-1 space-y-6 pb-6" aria-live="polite">
+      <div className="flex-1 space-y-10 pb-10" aria-live="polite">
         {turns.map((t) => (
-          <div key={t.id} className="space-y-3">
-            <p className="ml-auto w-fit max-w-[85%] rounded-2xl bg-zinc-800 px-4 py-2 text-sm">{t.question}</p>
+          <div key={t.id} className="space-y-4">
+            <p className="ml-auto w-fit max-w-[85%] rounded-2xl bg-zinc-800 px-5 py-3 text-base">{t.question}</p>
             <Answer
               turn={t}
               onPick={(login, q) => {
@@ -261,9 +273,9 @@ export default function AskChat() {
         {download.error && <p className="text-sm text-red-400">{download.error}</p>}
         <div ref={bottom} />
       </div>
-      <div className="sticky bottom-0 space-y-3 bg-black/80 py-4 backdrop-blur">
+      <div className="sticky bottom-0 bg-background pb-8 pt-2">
+        <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-background to-transparent" />
         {form}
-        <div className="flex justify-center">{lookup}</div>
       </div>
     </main>
   );
