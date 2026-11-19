@@ -15,6 +15,10 @@ const EXAMPLES = [
   "When did he do his island stream?",
 ];
 
+const LABEL = "text-xs uppercase tracking-[0.2em] text-zinc-500";
+const FIELD = "border border-zinc-700 bg-[#fbfaf6] outline-none focus:border-zinc-50";
+const INK_BUTTON = "bg-zinc-50 text-zinc-950 hover:bg-zinc-200 disabled:opacity-40";
+
 type Turn = { id: number; question: string; result: AskResult | null; error: string | null };
 
 function monthLabel(key: string): string {
@@ -28,7 +32,7 @@ function ClipTile({ clip }: { clip: Pick<Clip, "url" | "title" | "thumbnail_url"
       href={clip.url}
       target="_blank"
       rel="noreferrer"
-      className="block overflow-hidden rounded-lg border border-zinc-800 transition-colors hover:border-zinc-500"
+      className="block overflow-hidden rounded-xl border border-zinc-800 bg-white/60 transition-colors hover:border-zinc-700"
     >
       {clip.thumbnail_url && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -47,22 +51,22 @@ function ClipTile({ clip }: { clip: Pick<Clip, "url" | "title" | "thumbnail_url"
 function Months({ months, onDownload, busy }: { months: AskMonth[]; onDownload: (c: Clip[]) => void; busy: boolean }) {
   const all = months.flatMap((m) => m.clips);
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <button
         onClick={() => onDownload(all)}
         disabled={busy || all.length === 0}
-        className="rounded-lg border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-800 disabled:opacity-50"
+        className="rounded-full border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-800 disabled:opacity-50"
       >
         {busy ? "Downloading..." : `Download all ${all.length} clips`}
       </button>
       {months.map((m) => (
-        <section key={m.month} className="space-y-2">
-          <h3 className="text-base font-semibold">
-            {monthLabel(m.month)}
-            {!m.exact && <span className="ml-2 text-xs font-normal text-amber-400">not fully loaded</span>}
+        <section key={m.month} className="space-y-3">
+          <h3 className="flex items-baseline gap-3">
+            <span className="text-base font-semibold">{monthLabel(m.month)}</span>
+            {!m.exact && <span className="text-xs text-amber-400">not fully loaded</span>}
           </h3>
           {m.clips.length === 0 ? (
-            <p className="text-xs text-zinc-500">No clips loaded for this month.</p>
+            <p className="text-sm text-zinc-500">No clips loaded for this month.</p>
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
               {m.clips.map((c) => (
@@ -73,6 +77,30 @@ function Months({ months, onDownload, busy }: { months: AskMonth[]; onDownload: 
         </section>
       ))}
     </div>
+  );
+}
+
+function Avatar() {
+  return (
+    <span
+      aria-hidden
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-50 text-sm font-semibold text-zinc-950"
+    >
+      S
+    </span>
+  );
+}
+
+function Thinking() {
+  return (
+    <p className="flex items-center gap-2 text-base text-zinc-400" role="status">
+      Thinking
+      <span className="flex gap-1" aria-hidden>
+        {[0, 150, 300].map((d) => (
+          <span key={d} className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-400" style={{ animationDelay: `${d}ms` }} />
+        ))}
+      </span>
+    </p>
   );
 }
 
@@ -88,48 +116,57 @@ function Answer({
   downloading: boolean;
 }) {
   const r = turn.result;
-  if (turn.error) return <p className="text-base text-red-400">{turn.error}</p>;
-  if (!r) return <p className="text-base text-zinc-400">Thinking...</p>;
   return (
-    <div className="space-y-4">
-      <p className="whitespace-pre-wrap text-base leading-relaxed">{r.answer}</p>
-      {r.note && <p className="text-xs text-amber-400">{r.note}</p>}
-      {!r.confident && r.kind === "answer" && r.sources.length > 0 && (
-        <p className="text-xs text-amber-400">Low confidence: treat these clips as possible leads only.</p>
-      )}
-      {r.suggestions.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {r.suggestions.map((s) => (
-            <button
-              key={s.login}
-              onClick={() => onPick(s.login, turn.question)}
-              className="rounded-full border border-zinc-700 px-3 py-1 text-sm hover:bg-zinc-800"
-            >
-              {s.display_name}
-              {s.is_live && <span className="ml-1 text-xs text-red-400">live</span>}
-            </button>
-          ))}
-        </div>
-      )}
-      {r.months.length > 0 && <Months months={r.months} onDownload={onDownload} busy={downloading} />}
-      {r.sources.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
-          {r.sources.map((s) => (
-            <ClipTile key={s.id} clip={{ ...s, thumbnail_url: s.thumbnail_url ?? "" }} />
-          ))}
-        </div>
-      )}
-      <p className="text-xs text-zinc-500">
-        {r.tool ?? "no tool"} - {r.seconds}s - {r.usage.prompt_tokens + r.usage.output_tokens} tokens (local model)
-        {r.streamer && (
+    <div className="flex gap-4">
+      <Avatar />
+      <div className="min-w-0 flex-1 space-y-4 rounded-2xl border border-zinc-800 bg-[#fbfaf6] p-6">
+        <p className={LABEL}>Shimaclips</p>
+        {turn.error && <p className="text-base text-red-400">{turn.error}</p>}
+        {!turn.error && !r && <Thinking />}
+        {r && (
           <>
-            {" - "}
-            <Link href={`/browse?streamer=${r.streamer.login}`} className="underline hover:text-zinc-300">
-              open {r.streamer.display_name} in the calendar
-            </Link>
+            <p className="whitespace-pre-wrap text-base leading-relaxed">{r.answer}</p>
+            {r.note && <p className="text-sm text-amber-400">{r.note}</p>}
+            {!r.confident && r.kind === "answer" && r.sources.length > 0 && (
+              <p className="text-sm text-amber-400">Low confidence: treat these clips as possible leads only.</p>
+            )}
+            {r.suggestions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {r.suggestions.map((s) => (
+                  <button
+                    key={s.login}
+                    onClick={() => onPick(s.login, turn.question)}
+                    className="rounded-full border border-zinc-700 px-4 py-1.5 text-sm hover:bg-zinc-800"
+                  >
+                    {s.display_name}
+                    {s.is_live && <span className="ml-1 text-xs text-red-400">live</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {r.months.length > 0 && <Months months={r.months} onDownload={onDownload} busy={downloading} />}
+            {r.sources.length > 0 && (
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+                {r.sources.map((s) => (
+                  <ClipTile key={s.id} clip={{ ...s, thumbnail_url: s.thumbnail_url ?? "" }} />
+                ))}
+              </div>
+            )}
+            {r.after && <p className="text-base leading-relaxed text-zinc-300">{r.after}</p>}
+            <p className="border-t border-zinc-800 pt-3 text-xs text-zinc-500">
+              {r.tool ?? "no tool"} - {r.seconds}s - {r.usage.prompt_tokens + r.usage.output_tokens} tokens (local model)
+              {r.streamer && (
+                <>
+                  {" - "}
+                  <Link href={`/browse?streamer=${r.streamer.login}`} className="underline hover:text-zinc-50">
+                    open {r.streamer.display_name} in the calendar
+                  </Link>
+                </>
+              )}
+            </p>
           </>
         )}
-      </p>
+      </div>
     </div>
   );
 }
@@ -142,12 +179,13 @@ export default function AskChat() {
   const [busy, setBusy] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
   const nextId = useRef(0);
-  const bottom = useRef<HTMLDivElement>(null);
+  const lastTurn = useRef<HTMLDivElement>(null);
   const download = useDownload("ask");
+  const count = turns.length;
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [turns]);
+    if (count > 0) lastTurn.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [count]);
 
   async function send(question: string, login: string | null = current) {
     const q = question.trim();
@@ -168,7 +206,7 @@ export default function AskChat() {
     }
   }
 
-  const empty = turns.length === 0;
+  const empty = count === 0;
 
   const form = (
     <form
@@ -176,7 +214,7 @@ export default function AskChat() {
         e.preventDefault();
         void send(text);
       }}
-      className="flex w-full gap-2"
+      className="flex w-full gap-3"
     >
       <input
         value={text}
@@ -185,12 +223,12 @@ export default function AskChat() {
         autoFocus
         aria-label="Ask a question about a streamer's clips"
         placeholder={current ? `Ask about ${current}'s clips or Twitch` : "Ask about a streamer's clips, for example top clips for jasontheween this month"}
-        className={`flex-1 rounded-2xl border border-zinc-700 bg-zinc-900 px-6 outline-none focus:border-zinc-400 ${empty ? "py-5 text-lg" : "py-4 text-base"}`}
+        className={`flex-1 rounded-2xl px-6 ${FIELD} ${empty ? "py-5 text-lg" : "py-4 text-base"}`}
       />
       <button
         type="submit"
         disabled={busy || text.trim().length < 3}
-        className="rounded-2xl bg-zinc-100 px-6 text-base font-medium text-zinc-900 hover:bg-white disabled:opacity-40"
+        className={`rounded-2xl px-7 text-base font-medium ${INK_BUTTON}`}
       >
         {busy ? "Thinking" : "Ask"}
       </button>
@@ -202,7 +240,7 @@ export default function AskChat() {
       <button
         onClick={() => setLookupOpen((v) => !v)}
         aria-expanded={lookupOpen}
-        className="text-sm text-zinc-500 underline decoration-zinc-700 underline-offset-4 hover:text-zinc-300"
+        className="text-sm text-zinc-400 underline decoration-zinc-700 underline-offset-4 hover:text-zinc-50"
       >
         Browse a streamer&apos;s calendar
       </button>
@@ -217,8 +255,9 @@ export default function AskChat() {
   if (empty) {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-6 py-10">
-        <div className="space-y-2 text-center">
-          <h1 className="text-5xl font-bold">Shimaclips</h1>
+        <div className="space-y-3 text-center">
+          <p className={LABEL}>Clip assistant</p>
+          <h1 className="text-5xl font-semibold tracking-tight">Shimaclips</h1>
           <p className="text-lg text-zinc-400">Ask me anything about a streamer&apos;s Twitch clips.</p>
         </div>
         {form}
@@ -227,7 +266,7 @@ export default function AskChat() {
             <button
               key={ex}
               onClick={() => void send(ex)}
-              className="rounded-full border border-zinc-800 px-4 py-2 text-sm text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+              className="rounded-full border border-zinc-700 px-4 py-2 text-sm text-zinc-400 hover:border-zinc-50 hover:text-zinc-50"
             >
               {ex}
             </button>
@@ -240,13 +279,13 @@ export default function AskChat() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-8">
-      <header className="flex flex-wrap items-center justify-between gap-3 py-6">
-        <h1 className="text-xl font-bold">Shimaclips</h1>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 py-5">
+        <h1 className="text-sm font-semibold uppercase tracking-[0.3em]">Shimaclips</h1>
         <div className="flex flex-wrap items-center gap-5 text-sm text-zinc-400">
           {current && (
             <span>
-              Talking about <span className="text-zinc-200">{current}</span>{" "}
-              <button onClick={() => setCurrent(null)} className="underline hover:text-zinc-200">
+              Talking about <span className="font-medium text-zinc-50">{current}</span>{" "}
+              <button onClick={() => setCurrent(null)} className="underline hover:text-zinc-50">
                 clear
               </button>
             </span>
@@ -254,10 +293,10 @@ export default function AskChat() {
           {renderLookup("right")}
         </div>
       </header>
-      <div className="flex-1 space-y-10 pb-10" aria-live="polite">
-        {turns.map((t) => (
-          <div key={t.id} className="space-y-4">
-            <p className="ml-auto w-fit max-w-[85%] rounded-2xl bg-zinc-800 px-5 py-3 text-base">{t.question}</p>
+      <div className="flex-1 space-y-12 py-10" aria-live="polite">
+        {turns.map((t, i) => (
+          <div key={t.id} ref={i === count - 1 ? lastTurn : undefined} className="scroll-mt-6 space-y-6">
+            <p className="ml-auto w-fit max-w-[80%] rounded-2xl bg-zinc-50 px-5 py-3 text-base text-zinc-950">{t.question}</p>
             <Answer
               turn={t}
               onPick={(login, q) => {
@@ -270,8 +309,8 @@ export default function AskChat() {
           </div>
         ))}
         {download.job && <DownloadPanel state={download.job} />}
-        {download.error && <p className="text-sm text-red-400">{download.error}</p>}
-        <div ref={bottom} />
+        {download.error && <p className="text-base text-red-400">{download.error}</p>}
+        <div className="h-[55vh]" aria-hidden />
       </div>
       <div className="sticky bottom-0 bg-background pb-8 pt-2">
         <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-background to-transparent" />

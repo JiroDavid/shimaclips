@@ -62,8 +62,8 @@ export default function ClipCard({
       <div className="relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={clip.thumbnail_url} alt="" className="aspect-video w-full object-cover" />
-        <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-xs font-semibold">#{rank}</span>
-        <span className="absolute bottom-2 right-2 rounded bg-black/70 px-2 py-0.5 text-xs">
+        <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-xs font-semibold text-white">#{rank}</span>
+        <span className="absolute bottom-2 right-2 rounded bg-black/70 px-2 py-0.5 text-xs text-white">
           {formatDuration(clip.duration)}
         </span>
         <input type="checkbox" checked={checked} onChange={onToggle} onPointerDown={() => controller?.close()} className="absolute right-2 top-2 h-5 w-5 accent-purple-500" />

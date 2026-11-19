@@ -109,7 +109,7 @@ def test_monthly_tool_returns_months(monkeypatch, svc):
     months = [{"month": "2026-01", "clips": [{"id": "a"}], "exact": True}, {"month": "2026-02", "clips": [], "exact": False}]
     monkeypatch.setattr(answer, "top_by_month", lambda *a: months)
     r = answer.ask(svc, "rewind", None, TODAY)
-    assert r["months"] == months and "2026" in r["answer"] and "not fully loaded" in r["answer"]
+    assert r["months"] == months and "2026" in r["answer"] and "not fully loaded" in r["after"]
 
 
 def test_future_year_rejected(monkeypatch, svc):
@@ -179,3 +179,13 @@ def test_glued_names_fall_back_to_a_known_streamer_in_the_question(monkeypatch, 
     monkeypatch.setattr(answer, "is_exact", lambda *a: True)
     r = answer.ask(svc, "who is burger? jay stableronaldo", None, TODAY)
     assert r["kind"] == "answer" and r["streamer"]["login"] == "jay"
+
+
+def test_search_answer_and_date_note_are_separate_fields(monkeypatch, svc):
+    patch_flow(monkeypatch, tool="search_clips", args={"streamer": "jay", "query": "boxing"})
+    monkeypatch.setattr(answer, "_transcribed", lambda *a: 5)
+    results = [{"id": "c", "title": "t", "url": "u", "view_count": 1, "created_at": "2026-02-03T00:00:00Z", "transcript": "x"}]
+    monkeypatch.setattr(answer, "search_clips", lambda conn, *a, **k: {"results": results, "confident": True, "unseen_words": []})
+    monkeypatch.setattr(answer, "_generate", lambda *a: ("He talks about boxing [1].", USAGE))
+    r = answer.ask(svc, "boxing", None, TODAY)
+    assert r["answer"] == "He talks about boxing [1]." and "2026-02-03" in r["after"]

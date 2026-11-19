@@ -264,6 +264,7 @@ export type AskResult = {
   question: string;
   kind: "answer" | "refusal" | "needs_streamer" | "unknown_streamer" | "error";
   answer: string;
+  after: string;
   note?: string;
   streamer: { login: string; display_name: string } | null;
   suggestions: AskSuggestion[];

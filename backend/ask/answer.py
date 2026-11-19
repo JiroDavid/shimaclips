@@ -99,7 +99,9 @@ def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: 
             r = top_clips(conn, streamer.login, args["start"], args["end"], limit, args.get("sort", "views"))
             out["data"] = r
             out["sources"] = r["clips"]
-            out["answer"] = f"Top {len(r['clips'])} clips for {streamer.display_name}, {r['start']} to {r['end']}."
+            out["answer"] = f"Here are the top {len(r['clips'])} clips for {streamer.display_name}, {r['start']} to {r['end']}."
+            if not is_exact(svc, streamer, start, end, today):
+                out["after"] = "This period isn't fully loaded yet, so there may be clips with more views than these."
     elif tool == "top_clips_by_month":
         year = int(args.get("year", today.year))
         if not 2007 <= year <= today.year:
@@ -108,9 +110,10 @@ def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: 
         months = top_by_month(svc, streamer, year, per_month, today)
         out["months"] = months
         total = sum(len(m["clips"]) for m in months)
-        out["answer"] = f"Top {per_month} clips for each month of {year} for {streamer.display_name}: {total} clips across {len(months)} months."
+        out["answer"] = f"Here are the top {per_month} clips for each month of {year} for {streamer.display_name}."
+        out["after"] = f"That is {total} clips across {len(months)} months."
         if not all(m["exact"] for m in months):
-            out["answer"] += " Months marked as not fully loaded may be missing some clips."
+            out["after"] += " Months marked as not fully loaded may be missing some clips."
     elif tool == "search_clips":
         if _transcribed(conn, bid) == 0:
             out["answer"] = (
@@ -136,8 +139,9 @@ def _run_tool(svc: Services, conn, out: dict, usage: dict, question: str, tool: 
             _add(usage, u)
             days = sorted(x["created_at"][:10] for x in r["results"])
             span = days[0] if days[0] == days[-1] else f"{days[0]} and {days[-1]}"
-            out["answer"] = (
-                f"{text}\n\nThe cited clips were made on or between {span}. "
+            out["answer"] = text
+            out["after"] = (
+                f"The cited clips were made on or between {span}. "
                 "A clip date is when the clip was made, not necessarily when the stream happened."
             )
     elif tool == "streamer_info":
@@ -160,7 +164,7 @@ def ask(svc: Services, question: str, default_login: str | None = None, today: d
     usage = dict(NO_USAGE)
     out: dict = {
         "question": question, "kind": "answer", "tool": None, "args": {}, "streamer": None,
-        "suggestions": [], "sources": [], "months": [], "confident": True,
+        "suggestions": [], "sources": [], "months": [], "confident": True, "after": "",
     }
 
     def finish() -> dict:
