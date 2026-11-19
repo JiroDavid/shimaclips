@@ -16,8 +16,8 @@ const EXAMPLES = [
 ];
 
 const LABEL = "text-xs uppercase tracking-[0.2em] text-zinc-500";
-const FIELD = "border border-zinc-800 bg-zinc-900 outline-none placeholder:text-zinc-500 focus:border-zinc-600";
-const INK_BUTTON = "bg-accent-strong text-white hover:bg-accent disabled:opacity-40";
+const FIELD = "border border-zinc-700 bg-zinc-900 outline-none focus:border-zinc-400";
+const INK_BUTTON = "bg-zinc-100 text-zinc-900 hover:bg-white disabled:opacity-40";
 
 type Turn = { id: number; question: string; result: AskResult | null; error: string | null };
 
@@ -80,18 +80,15 @@ function Months({ months, onDownload, busy }: { months: AskMonth[]; onDownload: 
   );
 }
 
-function Asterisk({ className }: { className: string }) {
+function Logo({ className }: { className: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-      {[0, 45, 90, 135].map((deg) => (
-        <line key={deg} x1="12" y1="2.5" x2="12" y2="21.5" transform={`rotate(${deg} 12 12)`} />
-      ))}
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/shiba.png" alt="" width={512} height={512} className={className} />
   );
 }
 
 function Avatar() {
-  return <Asterisk className="mt-1 h-7 w-7 shrink-0 text-accent" />;
+  return <Logo className="h-10 w-10 shrink-0" />;
 }
 
 function Thinking() {
@@ -100,7 +97,7 @@ function Thinking() {
       Thinking
       <span className="flex gap-1" aria-hidden>
         {[0, 150, 300].map((d) => (
-          <span key={d} className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" style={{ animationDelay: `${d}ms` }} />
+          <span key={d} className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-400" style={{ animationDelay: `${d}ms` }} />
         ))}
       </span>
     </p>
@@ -257,11 +254,10 @@ export default function AskChat() {
 
   if (empty) {
     return (
-      <div className="theme-warm min-h-screen">
       <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-8 px-6 py-10">
         <div className="space-y-3 text-center">
-          <Asterisk className="mx-auto h-10 w-10 text-accent" />
-          <h1 className="font-serif text-5xl tracking-tight">What clips are you after?</h1>
+          <Logo className="mx-auto h-24 w-24" />
+          <h1 className="text-5xl font-semibold tracking-tight">What clips are you after?</h1>
           <p className="text-lg text-zinc-400">Ask about any Twitch streamer and their clips.</p>
         </div>
         {form}
@@ -278,15 +274,13 @@ export default function AskChat() {
         </div>
         <div className="pt-4">{renderLookup("center")}</div>
       </main>
-      </div>
     );
   }
 
   return (
-    <div className="theme-warm min-h-screen">
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-8">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 py-5">
-        <h1 className="text-sm font-semibold uppercase tracking-[0.3em] text-accent">Shimaclips</h1>
+        <h1 className="text-sm font-semibold uppercase tracking-[0.3em]">Shimaclips</h1>
         <div className="flex flex-wrap items-center gap-5 text-sm text-zinc-400">
           {current && (
             <span>
@@ -323,6 +317,5 @@ export default function AskChat() {
         {form}
       </div>
     </main>
-    </div>
   );
 }
