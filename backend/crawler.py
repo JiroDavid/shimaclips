@@ -20,6 +20,7 @@ class WatchCrawler:
     def __init__(self, store: Store, manager: LoadManager, twitch_factory: Callable[[], TwitchClient],
                  interval: float = 5.0, refresh_after: timedelta = timedelta(hours=24),
                  window_delay: float = 0.25, retry_after: float = 60.0,
+                 login_check_every: float = 6 * 3600.0,
                  now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
                  monotonic: Callable[[], float] = time.monotonic):
         self.store = store
@@ -29,6 +30,7 @@ class WatchCrawler:
         self.refresh_after = refresh_after
         self.window_delay = window_delay
         self.retry_after = retry_after
+        self.login_check_every = login_check_every
         self.now = now
         self.monotonic = monotonic
         self._stopped = threading.Event()
@@ -36,6 +38,7 @@ class WatchCrawler:
         self._working: str | None = None
         self._errors: dict[str, float] = {}
         self._setup_failed_at: float | None = None
+        self._logins_checked_at: float | None = None
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
@@ -185,7 +188,27 @@ class WatchCrawler:
         except _SetupFailed:
             return
 
+    def _refresh_logins(self, entries: list[WatchEntry]) -> None:
+        now = self.monotonic()
+        if self._logins_checked_at is not None and now - self._logins_checked_at < self.login_check_every:
+            return
+        self._logins_checked_at = now
+        twitch = self._twitch()
+        for e in entries:
+            if e.broadcaster_id is None or self._should_stop():
+                continue
+            try:
+                user = twitch.get_user_by_id(e.broadcaster_id)
+            except Exception:
+                log.warning("Could not refresh the name of watchlist streamer '%s'", e.login, exc_info=True)
+                continue
+            if user is not None and user.login != e.login:
+                log.info("Watchlist streamer '%s' is now '%s'", e.login, user.login)
+                self.store.upsert_streamer(user)
+
     def _tick(self) -> None:
+        entries = self.store.watch_list()
+        self._refresh_logins(entries)
         entries = self.store.watch_list()
         with self._lock:
             known = {e.login for e in entries}

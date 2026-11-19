@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from twitch import Clip, User
+from twitch import Clip, User, clip_url
 
 _FMT = "%Y-%m-%dT%H:%M:%SZ"
 SCHEMA_VERSION = 4
@@ -177,13 +177,24 @@ class Store:
                 conn.executemany(sql, rows)
 
     def upsert_streamer(self, user: User) -> None:
-        self._write(
-            "INSERT INTO streamers (broadcaster_id, login, display_name, account_created) "
-            "VALUES (?, ?, ?, ?) ON CONFLICT(broadcaster_id) DO UPDATE SET "
-            "login=excluded.login, display_name=excluded.display_name, "
-            "account_created=excluded.account_created",
-            [(user.id, user.login, user.display_name, _enc(user.created_at))],
-        )
+        with closing(self._connect()) as conn:
+            with conn:
+                conn.execute(
+                    "INSERT INTO streamers (broadcaster_id, login, display_name, account_created) "
+                    "VALUES (?, ?, ?, ?) ON CONFLICT(broadcaster_id) DO UPDATE SET "
+                    "login=excluded.login, display_name=excluded.display_name, "
+                    "account_created=excluded.account_created",
+                    (user.id, user.login, user.display_name, _enc(user.created_at)),
+                )
+                conn.execute(
+                    "DELETE FROM watchlist WHERE broadcaster_id = ? AND login != ? "
+                    "AND EXISTS (SELECT 1 FROM watchlist WHERE login = ?)",
+                    (user.id, user.login, user.login),
+                )
+                conn.execute(
+                    "UPDATE watchlist SET login = ? WHERE broadcaster_id = ? AND login != ?",
+                    (user.login, user.id, user.login),
+                )
 
     def known_logins(self) -> list[str]:
         with closing(self._connect()) as conn:
@@ -410,7 +421,7 @@ class Store:
                 [*args, limit, offset],
             ).fetchall()
         clips = [
-            Clip(r["id"], r["url"], r["title"], r["thumbnail_url"], r["view_count"],
+            Clip(r["id"], clip_url(r["id"]), r["title"], r["thumbnail_url"], r["view_count"],
                  r["duration"], r["creator_name"], r["created_at"])
             for r in rows
         ]

@@ -60,9 +60,13 @@ def _rfc3339(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def clip_url(clip_id: str) -> str:
+    return f"https://clips.twitch.tv/{clip_id}"
+
+
 def _to_clip(c: dict) -> Clip:
     return Clip(
-        id=c["id"], url=c["url"], title=c["title"], thumbnail_url=c["thumbnail_url"],
+        id=c["id"], url=clip_url(c["id"]), title=c["title"], thumbnail_url=c["thumbnail_url"],
         view_count=c["view_count"], duration=c["duration"],
         creator_name=c["creator_name"], created_at=c["created_at"],
     )
@@ -173,6 +177,14 @@ class TwitchClient:
     def get_user(self, login: str) -> User | None:
         login = login.strip().lstrip("@").lower()
         data = self._get("/users", {"login": login})["data"]
+        if not data:
+            return None
+        u = data[0]
+        created = datetime.fromisoformat(u["created_at"].replace("Z", "+00:00")).astimezone(timezone.utc)
+        return User(id=u["id"], login=u["login"], display_name=u["display_name"], created_at=created)
+
+    def get_user_by_id(self, user_id: str) -> User | None:
+        data = self._get("/users", {"id": user_id})["data"]
         if not data:
             return None
         u = data[0]

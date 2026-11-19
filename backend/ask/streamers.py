@@ -1,4 +1,6 @@
+import logging
 import re
+import time
 from difflib import SequenceMatcher
 
 from ask.services import Services
@@ -41,13 +43,34 @@ def mentioned(svc: Services, question: str) -> str | None:
     return found[0] if found else None
 
 
+log = logging.getLogger(__name__)
+_checked: dict[str, float] = {}
+REFRESH_EVERY = 3600.0
+
+
+def _refreshed(svc: Services, streamer: Streamer) -> Streamer:
+    now = time.monotonic()
+    if svc.twitch is None or now - _checked.get(streamer.broadcaster_id, -REFRESH_EVERY) < REFRESH_EVERY:
+        return streamer
+    _checked[streamer.broadcaster_id] = now
+    try:
+        user = svc.twitch().get_user_by_id(streamer.broadcaster_id)
+    except Exception:
+        log.warning("Could not refresh the name of streamer '%s'", streamer.login, exc_info=True)
+        return streamer
+    if user is None or user.login == streamer.login:
+        return streamer
+    svc.store.upsert_streamer(user)
+    return svc.store.get_streamer(user.login) or streamer
+
+
 def resolve(svc: Services, name: str) -> dict:
     login = clean_login(name)
     if not 1 <= len(login) <= 25:
         return {"status": "unknown", "name": name, "suggestions": []}
     known = svc.store.get_streamer(login)
     if known is not None:
-        return {"status": "ok", "streamer": known}
+        return {"status": "ok", "streamer": _refreshed(svc, known)}
     if svc.twitch is None:
         return {"status": "unknown", "name": name, "suggestions": []}
     try:

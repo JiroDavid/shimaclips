@@ -23,6 +23,9 @@ class FakeTwitch:
     def search_channels(self, query, limit=8):
         return self.hits[:limit]
 
+    def get_user_by_id(self, uid):
+        return None
+
 
 @pytest.fixture
 def svc(tmp_path):

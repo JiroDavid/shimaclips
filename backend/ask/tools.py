@@ -60,7 +60,7 @@ def top_clips(
     limit = max(1, min(limit, MAX_LIMIT))
     order = "view_count DESC" if sort == "views" else "created_at DESC"
     rows = conn.execute(
-        f"SELECT id, title, url, view_count, created_at FROM clips "
+        f"SELECT id, title, 'https://clips.twitch.tv/' || id AS url, thumbnail_url, duration, creator_name, view_count, created_at FROM clips "
         f"WHERE broadcaster_id = ? AND created_at >= ? AND created_at < ? ORDER BY {order} LIMIT ?",
         (bid, s, e, limit),
     ).fetchall()

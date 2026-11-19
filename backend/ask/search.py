@@ -28,7 +28,7 @@ def search_clips(conn: sqlite3.Connection, login: str, query: str, limit: int = 
     results = []
     for h in ranked:
         row = conn.execute(
-            "SELECT k.id, k.title, k.url, k.view_count, k.created_at, t.text "
+            "SELECT k.id, k.title, 'https://clips.twitch.tv/' || k.id AS url, k.thumbnail_url, k.duration, k.creator_name, k.view_count, k.created_at, t.text "
             "FROM clips k LEFT JOIN transcripts t ON t.clip_id = k.id "
             "WHERE k.id = ? AND k.broadcaster_id = ?",
             (h.clip_id, bid),
