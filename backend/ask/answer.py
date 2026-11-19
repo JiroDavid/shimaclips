@@ -12,7 +12,7 @@ ANSWER_SYSTEM = (
     "You answer a question about a Twitch streamer using ONLY the numbered clips given. "
     "Cite clips as [1], [2]. Each clip has a clip date, which is when it was clipped and may differ "
     "from when the stream happened. If the clips do not answer the question, say so plainly. "
-    "Do not invent details. Keep it under 80 words."
+    "Do not invent details. Keep it under 80 words. Do not claim anything about people beyond what the clips say."
 )
 
 
@@ -72,8 +72,14 @@ def ask(conn: sqlite3.Connection, question: str, login: str, today: date | None 
                     "Only top clips from 2026 are transcribed."
                 )
             else:
-                out["answer"], u = _generate(question, r["results"])
+                text, u = _generate(question, r["results"])
                 usage = {k: usage[k] + u[k] for k in usage}
+                days = sorted(x["created_at"][:10] for x in r["results"])
+                span = days[0] if days[0] == days[-1] else f"{days[0]} and {days[-1]}"
+                out["answer"] = (
+                    f"{text}\n\nThe cited clips were made on or between {span}. "
+                    "A clip date is when the clip was made, not necessarily when the stream happened."
+                )
         else:
             out["answer"] = "I could not work out how to answer that with the clip library."
             out["confident"] = False
