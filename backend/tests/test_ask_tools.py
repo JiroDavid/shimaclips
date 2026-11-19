@@ -22,6 +22,9 @@ TODAY = date(2026, 11, 19)
     ("March 2025", (date(2025, 3, 1), date(2025, 4, 1))),
     ("december", (date(2026, 12, 1), date(2027, 1, 1))),
     ("Feb 2026", (date(2026, 2, 1), date(2026, 3, 1))),
+    ("in 2024", (date(2024, 1, 1), date(2025, 1, 1))),
+    ("during March 2025?", (date(2025, 3, 1), date(2025, 4, 1))),
+    ("in the past 30 days", (date(2026, 10, 21), date(2026, 11, 20))),
     ("sept", (date(2026, 9, 1), date(2026, 10, 1))),
     ("mar", (date(2026, 3, 1), date(2026, 4, 1))),
 ])
@@ -100,3 +103,7 @@ def test_resolve_month_before_last_across_year():
 
 def test_resolve_rejects_impossible_date():
     assert resolve("2026-02-31", TODAY) is None
+
+
+def test_since_is_not_silently_treated_as_a_single_month():
+    assert resolve("since March", TODAY) is None
