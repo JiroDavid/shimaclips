@@ -23,6 +23,9 @@ ACTIVE = ("queued", "finding", "transcribing", "indexing")
 DAYS = 365
 PER_MONTH_NEED = 120
 CAP = 1000
+TOP_DAYS = 60
+PER_DAY = 10
+FLOOR_PER_DAY = 2
 CHUNK = 50
 
 
@@ -118,7 +121,7 @@ class TranscriptionManager:
             except TwitchError:
                 failures += 1
         with closing(sqlite3.connect(self.svc.db_path, timeout=120)) as conn:
-            planned = pick_subset(conn, streamer.login, since.isoformat(), 60, 10, 2, CAP)
+            planned = pick_subset(conn, streamer.login, since.isoformat(), TOP_DAYS, PER_DAY, FLOOR_PER_DAY, CAP)
             if not planned:
                 job.state, job.error = "error", "No clips were found for this streamer in the last year."
                 if failures:
